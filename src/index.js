@@ -19,7 +19,7 @@ const log = ::console.log;
 
 const getWordRoot = word => {
   const wordRoot = dict[word] && dict[word][0];
-  return wordRoot && wordRoot.length > 2 ? wordRoot : word;
+  return wordRoot ? wordRoot : word;
 };
 
 
