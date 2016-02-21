@@ -1,8 +1,11 @@
 {
   "private": true,
   "dependencies": {
+    "github": "^0.2.4",
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "natural": "^0.2.1",
+    "remove-markdown": "^0.1.0"
   },
   "scripts": {
     "lint": "jscs ."
