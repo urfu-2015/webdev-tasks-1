@@ -17,11 +17,9 @@ const stem = ::PorterStemmerRu.stem;
 const log = ::console.log;
 
 
-const bannedRoots = new Set(['раз', 'при', 'под', 'воз', 'рас']);
 const getWordRoot = word => {
-  const wordRoot = dict[word];
-  const useRoot = wordRoot && wordRoot.length > 2 && !bannedRoots.has(wordRoot);
-  return useRoot ? wordRoot : word;
+  const wordRoot = dict[word] && dict[word][0];
+  return wordRoot && wordRoot.length > 2 ? wordRoot : word;
 };
 
 
@@ -87,5 +85,5 @@ export const print = n =>statistic
   .flatMap(identity)
   .groupBy(length)
   .take(n)
-  .flatMap((group, i) => group.map(assoc('n', i+1)))
+  .flatMap((group, i) => group.map(assoc('n', i + 1)))
   .map(statToString);
