@@ -67,7 +67,6 @@ var dictionary = {
         var j = rootWordLength;
         while (
             j <= firstWord.length &&
-            j <= secondWord.length &&
             i < firstWord.length / 2 &&
             i < secondWord.length / 2
         ) {
@@ -102,18 +101,28 @@ var sendHttpReq = function (path, callback) {
         method: 'GET',
         headers: {
             'User-Agent': 'My-Test-App',
-            //Authorization:,
+            //Authorization: ,
             Accept: 'application/vnd.github.v3+json'
         }
     };
 
     var req = https.request(options, function (res) {
         res.setEncoding('utf8');
-        this.data = '';
+        var data = '';
         res.on('data', (d) => {
-            this.data += d;
+            data += d;
         });
-        res.on('end', callback.bind(this));
+
+        res.on('end', function () {
+            var response = JSON.parse(data);
+            if (res.statusCode !== 200) {
+                console.log('Ошибка: HTTP ' + res.statusCode);
+                console.log(response.message);
+                console.log(response.documentation_url);
+                return;
+            }
+            callback(response);
+        });
     });
     req.end();
 };
@@ -122,20 +131,18 @@ var getRepos = function () {
     sendHttpReq('/orgs/urfu-2015/repos', getTasks);
 };
 
-var getTasks = function () {
-    var json = JSON.parse(this.data);
+var getTasks = function (response) {
     var taskCounter = 0;
     var tasksParsedCounter = 0;
-    json.forEach(function (entry) {
+    response.forEach(function (entry) {
         if (
             entry.name.indexOf('verstka-tasks-') !== -1 ||
             entry.name.indexOf('javascript-tasks-') !== -1
         ) {
             taskCounter++;
             var path = '/repos/urfu-2015/' + entry.name + '/contents/README.md?ref=master';
-            sendHttpReq(path, function () {
-                var json = JSON.parse(this.data);
-                var taskText = (new Buffer(json.content, 'base64')).toString('utf-8');
+            sendHttpReq(path, function (response) {
+                var taskText = (new Buffer(response.content, 'base64')).toString('utf-8');
                 dictionary.parse(taskText);
                 tasksParsedCounter++;
                 if (taskCounter === tasksParsedCounter) {
