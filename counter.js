@@ -67,8 +67,7 @@ var dictionary = {
         var j = rootWordLength;
         while (
             j <= firstWord.length &&
-            i < firstWord.length / 2 &&
-            i < secondWord.length / 2
+            i < firstWord.length / 2
         ) {
             j = i + rootWordLength;
             var rootWord = firstWord.slice(i, j);
