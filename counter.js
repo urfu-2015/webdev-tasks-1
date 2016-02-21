@@ -116,7 +116,7 @@ function getTop(result, n) {
         n = result.length;
     }
     for (var i = 0; i < n; i++) {
-        var str = result[i].stem + ' ' + result[i].words[0] + ' ' + result[i].words.length;
+        var str = result[i].words[0] + ' ' + result[i].words.length;
         console.log(str);
     }
 };
