@@ -15,8 +15,8 @@ export const ifDefThen = when(compose(not, isNil));
 export const setOf = x => new Set(x);
 
 
-export const statToString = ({name, length, source}) =>
-  `${name} ${length} (${Array.from(source).join(', ')})`;
+export const statToString = ({n, name, length, source}) =>
+  `${n}\t${name}\t${length}\t(${Array.from(source).join(', ')})`;
 
 
 export const callProp = (prop, ...args) => x => x[prop](...args);

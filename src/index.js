@@ -1,7 +1,7 @@
 import mystem from 'mystem-wrapper';
 import {
   identity, has, compose, split, prop, replace, find, negate,
-  lt, not, length, map, pipe, props, join, sortBy, slice
+  lt, not, length, map, pipe, props, join, sortBy, slice, assoc
 } from 'ramda';
 import {
   thisify, ifDefThen, statToString, callProp, lex, groupBy
@@ -17,7 +17,7 @@ const stem = ::PorterStemmerRu.stem;
 const log = ::console.log;
 
 
-const bannedRoots = new Set(['раз', 'при']);
+const bannedRoots = new Set(['раз', 'при', 'под', 'воз', 'рас']);
 const getWordRoot = word => {
   const wordRoot = dict[word];
   const useRoot = wordRoot && wordRoot.length > 2 && !bannedRoots.has(wordRoot);
@@ -25,13 +25,13 @@ const getWordRoot = word => {
 };
 
 
-const fetchTaskText = (from, to) =>
+const fetchTaskText = (from, to) => courseName =>
   Observable
     .range(from, to)
     .map(n => ({
       protocol: 'https',
       host: 'raw.githubusercontent.com',
-      pathname: `urfu-2015/verstka-tasks-${n}/master/README.md`
+      pathname: `urfu-2015/${courseName}-tasks-${n}/master/README.md`
     }))
     .map(format)
     .flatMap(fetch)
@@ -57,11 +57,13 @@ const analyze = thisify(
 
 
 mystem.start('l');
-const statistic = fetchTaskText(1, 10)
+const statistic = Observable
+  .from(['verstka', 'javascript'])
+  .flatMap(fetchTaskText(1, 10))
   ::tokenize()
   ::analyze(mystem.analyze)
   .filter(pipe(lex, ::excluded.has, not))
-  ::groupBy(lex)
+  ::groupBy(pipe(lex, stem))
   .map(createStatResult)
   ::groupBy(compose(getWordRoot, prop('name')))
   .map(mergeStatResult)
@@ -83,6 +85,7 @@ export const count = word => statistic.map(pipe(
 
 export const print = n =>statistic
   .flatMap(identity)
-  .take(20)
-  .map(statToString)
-  .subscribe(log);
+  .groupBy(length)
+  .take(n)
+  .flatMap((group, i) => group.map(assoc('n', i+1)))
+  .map(statToString);
