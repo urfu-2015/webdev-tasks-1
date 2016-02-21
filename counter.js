@@ -2,7 +2,6 @@
 
 var taskList = [];
 const https = require('https');
-const fs = require('fs');
 const badWords = require('./badWords.js');
 
 var dictionary = {
