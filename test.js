@@ -1,2 +1,2 @@
-var fuck = require('./counter.js');
-fuck.top(10);
+var counter = require('./counter.js');
+counter.top(10);
