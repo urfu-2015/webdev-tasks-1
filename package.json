@@ -1,6 +1,7 @@
 {
   "private": true,
   "dependencies": {
+    "async": "^1.5.2",
     "github": "^0.2.4",
     "jscs": "^2.2.1",
     "mocha": "^2.3.3",
