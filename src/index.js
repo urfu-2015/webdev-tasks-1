@@ -1,10 +1,17 @@
 import mystem from 'mystem-wrapper';
 import {
-  identity, has, compose, split, prop, replace, find, negate,
-  lt, not, length, map, pipe, props, join, sortBy, slice, assoc
+  identity, has, compose, split, prop, replace, find, negate, unary, useWith,
+  inc, lt, not, length, map, pipe, props, join, sortBy, slice, assoc, call,
+  flip, apply
 } from 'ramda';
+import RxFn from './RxFn';
+const {
+  combineLatest, flatMap, tap, filter, toArray, shareReplay, groupBy: groupBy$,
+  take
+} = RxFn;
+console.log(combineLatest);
 import {
-  thisify, ifDefThen, statToString, callProp, lex, groupBy
+  ifDefThen, statToString, callProp, lex, groupBy
 } from './utils';
 import {createStatResult, mergeStatResult} from './statisticResult';
 import {format} from 'url';
@@ -23,17 +30,21 @@ const getWordRoot = word => {
 };
 
 
-const fetchTaskText = (from, to) => courseName =>
-  Observable
-    .range(from, to)
-    .map(n => ({
-      protocol: 'https',
-      host: 'raw.githubusercontent.com',
-      pathname: `urfu-2015/${courseName}-tasks-${n}/master/README.md`
-    }))
-    .map(format)
-    .flatMap(fetch)
-    .flatMap(callProp('text'));
+const combineWith = pipe(combineLatest, unary, map);
+var generateUrl = (courseName, n) => ({
+  protocol: 'https',
+  host    : 'raw.githubusercontent.com',
+  pathname: `urfu-2015/${courseName}-tasks-${n}/master/README.md`
+});
+const fetchTaskText = (from, to) => pipe(
+  map(Observable.return),
+  combineWith(Observable.range(from, to)),
+  flatMap(identity),
+  map(apply(generateUrl)),
+  map(format),
+  flatMap(fetch),
+  flatMap(callProp('text'))
+);
 
 
 const normalizeText = pipe(
@@ -41,49 +52,53 @@ const normalizeText = pipe(
 );
 
 
-const tokenize = thisify(
-  $ => $.flatMap(split('\n'))
-    .map(normalizeText)
-    .flatMap(split(' '))
-    .filter(identity)
+const tokenize = pipe(
+  flatMap(split('\n')),
+  map(normalizeText),
+  flatMap(split(' ')),
+  filter(identity)
 );
 
-
-const analyze = thisify(
-  ($, analyze) => $.flatMap(analyze).flatMap(identity).filter(lex)
-);
-
+const analyze = pipe(flatMap(mystem.analyze), flatMap(identity), filter(lex));
 
 mystem.start('l');
-const statistic = Observable
-  .from(['verstka', 'javascript'])
-  .flatMap(fetchTaskText(1, 10))
-  ::tokenize()
-  ::analyze(mystem.analyze)
-  .filter(pipe(lex, ::excluded.has, not))
-  ::groupBy(pipe(lex, stem))
-  .map(createStatResult)
-  ::groupBy(compose(getWordRoot, prop('name')))
-  .map(mergeStatResult)
-  ::groupBy(pipe(prop('name'), slice(0, 7)))
-  .map(mergeStatResult)
-  .toArray()
-  .map(sortBy(pipe(length, negate)))
-  .tap(::mystem.close)
-  .shareReplay(1);
+const generateStatistic = pipe(
+  Observable.of,
+  fetchTaskText(1, 10),
+  tokenize,
+  analyze,
+  filter(pipe(lex, ::excluded.has, not)),
+  groupBy(pipe(lex, stem)),
+  map(createStatResult),
+  groupBy(compose(getWordRoot, prop('name'))),
+  map(mergeStatResult),
+  groupBy(pipe(prop('name'), slice(0, 7))),
+  map(mergeStatResult),
+  unary(toArray),
+  map(sortBy(pipe(length, negate))),
+  tap(::mystem.close),
+  shareReplay(1)
+);
 
+const statistic = generateStatistic('verstka', 'javascript');
 
-export const top = n => statistic
-  .flatMap(identity).take(n).map(props(['name', 'length'])).map(join(' '));
+export const top = n => pipe(
+  flatMap(identity),
+  take(n),
+  map(props(['name', 'length'])),
+  map(join(' '))
+)(statistic);
 
 export const count = word => statistic.map(pipe(
   find(pipe(prop('source'), callProp('has', stem(word)))),
   ifDefThen(prop('length'))
 ));
 
-export const print = n =>statistic
+export const print = n => statistic
   .flatMap(identity)
   .groupBy(length)
   .take(n)
-  .flatMap((group, i) => group.map(assoc('n', i + 1)))
+  .flatMap(useWith(call, [flip(map), pipe(inc, assoc('n'))]))
   .map(statToString);
+
+print(10).subscribe(log);
