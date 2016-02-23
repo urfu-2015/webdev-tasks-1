@@ -1,6 +1,7 @@
 {
     "excludeFiles": [
-        "**/node_modules/**"
+        "**/node_modules/**",
+        "**/dist/**"
     ],
     "esnext": true,
     "disallowImplicitTypeConversion": [
@@ -38,7 +39,7 @@
     },
     "disallowSpacesInsideParentheses": true,
     "disallowTabs": true,
-    "disallowTrailingComma": true,
+    "disallowTrailingComma": false,
     "disallowTrailingWhitespace": true,
     "disallowYodaConditions": true,
     "maximumLineLength": 100,
@@ -84,7 +85,7 @@
     "requireSpacesInNamedFunctionExpression": {
         "beforeOpeningCurlyBrace": true
     },
-    "validateIndentation": 4,
+    "validateIndentation": 2,
     "validateParameterSeparator": ", ",
     "validateQuoteMarks": "'"
 }

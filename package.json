@@ -1,10 +1,22 @@
 {
   "private": true,
   "dependencies": {
+    "babel": "^6.5.2",
+    "babel-cli": "^6.5.1",
+    "babel-preset-es2015": "^6.5.0",
+    "babel-preset-stage-0": "^6.5.0",
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "mystem-wrapper": "git@github.com:ZigGreen/mystem-wrapper.git",
+    "natural": "^0.2.1",
+    "node-fetch": "^1.3.3",
+    "ramda": "^0.19.1",
+    "rx": "^4.0.8"
   },
   "scripts": {
+    "postinstall": "babel src --out-dir dist --presets stage-0,es2015",
+    "babel": "babel src --out-dir dist --presets stage-0,es2015  --watch -s",
     "lint": "jscs ."
-  }
+  },
+  "devDependencies": {}
 }
