@@ -7,13 +7,8 @@ const stopWords = require('./stopWords.json');
 
 const OATH_TOKEN = fs.readFileSync('key.txt', 'utf-8');
 const GITHUB_API = 'https://api.github.com';
-<<<<<<< HEAD
-var GET_ROOT_SITE = 'http://vnutrislova.net/' + encodeURI('‡Á·Ó/ÔÓ-ÒÓÒÚ‡‚Û/');
-var REGEXP = /[^¿-ﬂ‡-ˇ∏®]+/g;
-=======
 var GET_ROOT_SITE = 'http://vnutrislova.net/' + encodeURI('—Ä–∞–∑–±–æ—Ä/–ø–æ-—Å–æ—Å—Ç–∞–≤—É/');
 var REGEXP = /[^–ê-–Ø–∞-—è—ë–Å]+/g;
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
 const stopRepos = ['urfu-2015/verstka-lectures', 'urfu-2015/javascript-lectures',
     'urfu-2015/guides', 'urfu-2015/javascript-slides',
     'urfu-2015/verstka-slides', 'urfu-2015/html-test-suite', 'urfu-2015/rebase-example-repo',
@@ -28,30 +23,17 @@ module.exports.count = function (word) {
 };
 
 /**
-<<<<<<< HEAD
- * ŒÒÌ‡‚Ì‡ˇ ÙÛÌÍˆËˇ, ‚˚ÔÓÎÌˇ˛˘‡ˇ Á‡ÔÓÒ˚ Í Github,
- * Í ÒÂ‚ËÒÛ ‡Á·Ó‡ ÒÎÓ‚ ÔÓ ÒÓÒÚ‡‚Û, Ë ÔÓ‚Ó‰ˇ˘‡ˇ ‡Ì‡ÎËÁ ‰‡ÌÌ˚ı
- *
- * @param req number|word
- * @param type top|count ÚËÔ Á‡ÔÓÒ‡
-=======
  * –û—Å–Ω–∞–≤–Ω–∞—è —Ñ—É–Ω–∫—Ü–∏—è, –≤—ã–ø–æ–ª–Ω—è—é—â–∞—è –∑–∞–ø—Ä–æ—Å—ã –∫ Github,
  * –∫ —Å–µ—Ä–≤–∏—Å—É —Ä–∞–∑–±–æ—Ä–∞ —Å–ª–æ–≤ –ø–æ —Å–æ—Å—Ç–∞–≤—É, –∏ –ø—Ä–æ–≤–æ–¥—è—â–∞—è –∞–Ω–∞–ª–∏–∑ –¥–∞–Ω–Ω—ã—Ö
  *
  * @param req number|word
  * @param type top|count —Ç–∏–ø –∑–∞–ø—Ä–æ—Å–∞
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
  */
 function getStatistics(req, type) {
     async.waterfall([
             /**
-<<<<<<< HEAD
-             * ÙÛÌÍˆËˇ, ‚˚ÔÓÎÌˇ˛˘‡ˇ Á‡ÔÓÒ Í GitHub,
-             * Ë ÔÂÂ‰‡˛˘‡ˇ ‚ callback ‚ÒÂ ÂÔ‡ÁËÚÓËË urfu-2015
-=======
              * —Ñ—É–Ω–∫—Ü–∏—è, –≤—ã–ø–æ–ª–Ω—è—é—â–∞—è –∑–∞–ø—Ä–æ—Å –∫ GitHub,
              * –∏ –ø–µ—Ä–µ–¥–∞—é—â–∞—è –≤ callback –≤—Å–µ —Ä–µ–ø–∞–∑–∏—Ç–æ—Ä–∏–∏ urfu-2015
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
              *
              * @param callback
              */
@@ -72,11 +54,7 @@ function getStatistics(req, type) {
                 );
             },
             /**
-<<<<<<< HEAD
-             * ‘ÛÌÍˆËˇ, ÒÓ·Ë‡˛˘‡ˇ ‚ÒÂ Ù‡ÈÎ˚ readme ËÁ ÂÔ‡ÁËÚÓËÂ‚
-=======
              * –§—É–Ω–∫—Ü–∏—è, —Å–æ–±–∏—Ä–∞—é—â–∞—è –≤—Å–µ —Ñ–∞–π–ª—ã readme –∏–∑ —Ä–µ–ø–∞–∑–∏—Ç–æ—Ä–∏–µ–≤
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
              *
              * @param reposList
              * @param callback
@@ -90,11 +68,7 @@ function getStatistics(req, type) {
                 async.forEach(reposList, function (repos, next) {
                     request({
                             url: GITHUB_API + '/repos/' + repos +
-<<<<<<< HEAD
                             '/readme?access_token=' + OATH_TOKEN,
-=======
-                                        '/readme?access_token=' + OATH_TOKEN,
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
                             method: 'GET',
                             headers: {'User-Agent': 'Webdev homework 1.0.0'}
                         },
@@ -102,11 +76,7 @@ function getStatistics(req, type) {
                             if (!err && res.statusCode === 200) {
                                 var parsedBody = JSON.parse(body);
                                 reposContent += ' ' + (new Buffer(parsedBody.content,
-<<<<<<< HEAD
                                         parsedBody.encoding).toString('utf-8'));
-=======
-                                                    parsedBody.encoding).toString('utf-8'));
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
                                 next();
                             }
                         }
@@ -116,13 +86,8 @@ function getStatistics(req, type) {
                 });
             },
             /**
-<<<<<<< HEAD
-             * ‘ÛÌÍˆËˇ - Ô‡ÒÂ, ÓÒÚ‡‚ÎˇÂÚ ÚÓÎ¸ÍÓ ÛÒÒÍËÂ ÒÎÓ‚‡, ·ÂÁ ÔÂ‰ÎÓ„Ó‚,
-             * ÒÓ˛ÁÓ‚ Ë ÁÌ‡ÍÓ‚ ÔÂÔËÌ‡ÌËˇ
-=======
              * –§—É–Ω–∫—Ü–∏—è - –ø–∞—Ä—Å–µ—Ä, –æ—Å—Ç–∞–≤–ª—è–µ—Ç —Ç–æ–ª—å–∫–æ —Ä—É—Å—Å–∫–∏–µ —Å–ª–æ–≤–∞, –±–µ–∑ –ø—Ä–µ–¥–ª–æ–≥–æ–≤,
              * —Å–æ—é–∑–æ–≤ –∏ –∑–Ω–∞–∫–æ–≤ –ø—Ä–µ–ø–∏–Ω–∞–Ω–∏—è
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
              *
              * @param reposContent
              * @param callback
@@ -132,31 +97,18 @@ function getStatistics(req, type) {
                 callback(null, reposContent);
             },
             /**
-<<<<<<< HEAD
-             * ‘ÛÌÍˆËˇ, ‚˚˜ËÒÎˇ˛˘‡ˇ ÍÓÌË ÒÎÓ‚, Ë ÔÓËÁ‚Ó‰ˇ˘‡ˇ ÔÓ‰Ò˜ÂÚ ÔÓ‚ÚÓÂÌËÈ ÒÎÓ‚
-=======
              * –§—É–Ω–∫—Ü–∏—è, –≤—ã—á–∏—Å–ª—è—é—â–∞—è –∫–æ—Ä–Ω–∏ —Å–ª–æ–≤, –∏ –ø—Ä–æ–∏–∑–≤–æ–¥—è—â–∞—è –ø–æ–¥—Å—á–µ—Ç –ø–æ–≤—Ç–æ—Ä–µ–Ω–∏–π —Å–ª–æ–≤
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
              *
              * @param reposContent
              * @param callback
              */
                 function doCount(reposContent, callback) {
-<<<<<<< HEAD
-                // wordsRoots - ‰Îˇ Í‡Ê‰Ó„Ó ÒÎÓ‚‡ ı‡ÌËÚÒˇ Â„Ó ÍÓÂÌ¸
-                var wordsRoots = {};
-                /* countRepetitions[root] {root, count, word} - ÒÚÛÍÚÛ‡, ‰Îˇ ı‡ÌÂÌËˇ ÔÓ‚ÚÓÂÌËÈ.
-                 count - ˜ËÒÎÓ ÔÓ‚ÚÓÂÌËÈ, word - ÔÂ‚ÓÂ ÒÎÓ‚Ó Ò ˝ÚËÏ ÍÓÂÌÏ.
-                 ≈„Ó ‚˚‚Â‰ÂÏ ‚ ÒÚ‡ÚËÒÚËÍÛ
-                 */
-=======
                 // wordsRoots - –¥–ª—è –∫–∞–∂–¥–æ–≥–æ —Å–ª–æ–≤–∞ —Ö—Ä–∞–Ω–∏—Ç—Å—è –µ–≥–æ –∫–æ—Ä–µ–Ω—å
                 var wordsRoots = {};
                 /* countRepetitions[root] {root, count, word} - —Å—Ç—Ä—É–∫—Ç—É—Ä–∞, –¥–ª—è —Ö—Ä–∞–Ω–µ–Ω–∏—è –ø–æ–≤—Ç–æ—Ä–µ–Ω–∏–π.
-                    count - —á–∏—Å–ª–æ –ø–æ–≤—Ç–æ—Ä–µ–Ω–∏–π, word - –ø–µ—Ä–≤–æ–µ —Å–ª–æ–≤–æ —Å —ç—Ç–∏–º –∫–æ—Ä–µ–Ω–º.
-                    –ï–≥–æ –≤—ã–≤–µ–¥–µ–º –≤ —Å—Ç–∞—Ç–∏—Å—Ç–∏–∫—É
-                */
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
+                 count - —á–∏—Å–ª–æ –ø–æ–≤—Ç–æ—Ä–µ–Ω–∏–π, word - –ø–µ—Ä–≤–æ–µ —Å–ª–æ–≤–æ —Å —ç—Ç–∏–º –∫–æ—Ä–µ–Ω–º.
+                 –ï–≥–æ –≤—ã–≤–µ–¥–µ–º –≤ —Å—Ç–∞—Ç–∏—Å—Ç–∏–∫—É
+                 */
                 var countRepetitions = {};
                 async.eachSeries(reposContent, function (word, next) {
                     request({
@@ -167,8 +119,7 @@ function getStatistics(req, type) {
                             if (stopWords.indexOf(word) === -1 && word !== '') {
                                 if (!err && res.statusCode === 200) {
                                     body = body.split(' ');
-<<<<<<< HEAD
-                                    var rootIndex = body.indexOf('ÍÓÂÌ¸');
+                                    var rootIndex = body.indexOf('–∫–æ—Ä–µ–Ω—å');
                                     if (rootIndex !== -1) {
                                         if (wordsRoots[word] === undefined) {
                                             var currentRoot = body[rootIndex + 1].
@@ -176,16 +127,6 @@ function getStatistics(req, type) {
                                             if (countRepetitions[currentRoot] === undefined) {
                                                 countRepetitions[currentRoot] =
                                                 {'root': currentRoot, 'count': 0, 'word': word};
-=======
-                                    var rootIndex = body.indexOf('–∫–æ—Ä–µ–Ω—å');
-                                    if (rootIndex !== -1) {
-                                        if (wordsRoots[word] === undefined) {
-                                            var currentRoot = body[rootIndex + 1].
-                                                                        replace(REGEXP, '');
-                                            if (countRepetitions[currentRoot] === undefined) {
-                                                countRepetitions[currentRoot] =
-                                                    {'root': currentRoot, 'count': 0, 'word': word};
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
                                             }
                                             wordsRoots[word] = currentRoot;
                                         }
@@ -209,11 +150,7 @@ function getStatistics(req, type) {
             }
         ],
         /**
-<<<<<<< HEAD
-         * ŒÒÌÓ‚ÌÓÈ callback
-=======
          * –û—Å–Ω–æ–≤–Ω–æ–π callback
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
          *
          * @param err
          * @param countRepetitions
@@ -230,11 +167,7 @@ function getStatistics(req, type) {
 }
 
 /**
-<<<<<<< HEAD
- * ¬ÒÔÓÏÓ„‡ÚÂÎ¸Ì‡ˇ ÙÛÌÍˆËˇ, ‰Îˇ ÒÓÚËÓ‚ÍË
-=======
  * –í—Å–ø–æ–º–æ–≥–∞—Ç–µ–ª—å–Ω–∞—è —Ñ—É–Ω–∫—Ü–∏—è, –¥–ª—è —Å–æ—Ä—Ç–∏—Ä–æ–≤–∫–∏
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
  *
  * @param a
  * @param b
@@ -250,11 +183,7 @@ function compare(a, b) {
 }
 
 /**
-<<<<<<< HEAD
- * ‘ÛÌÍˆËˇ ‚˚‚Ó‰‡ n ÔÂ‚˚ı ÒÎÓ‚
-=======
  * –§—É–Ω–∫—Ü–∏—è –≤—ã–≤–æ–¥–∞ n –ø–µ—Ä–≤—ã—Ö —Å–ª–æ–≤
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
  *
  * @param count
  * @param countRepetitions
@@ -272,11 +201,7 @@ function getTop(count, countRepetitions) {
 }
 
 /**
-<<<<<<< HEAD
- * ‘ÛÌÍˆËˇ ‚˚‚Ó‰‡ ÔÓ‚ÚÓÂÌËÈ ÒÎÓ‚‡ word
-=======
  * –§—É–Ω–∫—Ü–∏—è –≤—ã–≤–æ–¥–∞ –ø–æ–≤—Ç–æ—Ä–µ–Ω–∏–π —Å–ª–æ–≤–∞ word
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
  *
  * @param word
  * @param countRepetitions
@@ -288,10 +213,6 @@ function getCount(word, countRepetitions, wordsRoots) {
     } else {
         process.stdout.write(countRepetitions[wordsRoots[word]].count);
     }
-<<<<<<< HEAD
 }/**
  * Created by mv on 23.02.2016.
  */
-=======
-}
->>>>>>> 23d04564dcb92aff99527aaf2b8c1bf449b0502c
