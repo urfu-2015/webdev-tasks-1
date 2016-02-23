@@ -213,6 +213,4 @@ function getCount(word, countRepetitions, wordsRoots) {
     } else {
         process.stdout.write(countRepetitions[wordsRoots[word]].count);
     }
-}/**
- * Created by mv on 23.02.2016.
- */
+}
