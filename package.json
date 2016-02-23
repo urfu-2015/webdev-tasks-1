@@ -2,7 +2,8 @@
   "private": true,
   "dependencies": {
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "sync-request": "^3.0.0"
   },
   "scripts": {
     "lint": "jscs ."
