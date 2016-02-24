@@ -1,6 +1,5 @@
 'use strict';
 
-const http = require('http');
 const request = require('request');
 const fs = require('fs');
 const async = require('async');
@@ -18,6 +17,7 @@ var workingFuncs = 0;
 
 var wordsCount = {};
 var roots = {};
+var totalWords = 0;
 
 top(10);
 
@@ -52,7 +52,6 @@ function getReposList(username, finalCallback) {
 }
 
 function getRepoReadme(username, repoName, finalCallback) {
-    // console.log(repoName);
     var req_options = {
         url: GITHUB_API_URL + '/repos/' + username + '/' + repoName + '/readme',
         headers: {
@@ -66,9 +65,7 @@ function getRepoReadme(username, repoName, finalCallback) {
         function (err, res, body) {
             if (!err && res.statusCode === 200) {
                 var readme = JSON.parse(body);
-                //  console.log(readme.content);
                 parseText(new Buffer(readme.content, 'base64').toString('utf-8'), finalCallback);
-
             }
         }
     );
@@ -88,6 +85,11 @@ function parseText(text, finalCallback) {
     words = words.filter(function (word) {
         return STOP_WORDS.indexOf(word) === -1;
     });
+    totalWords += words.length;
+    parseWords(words, finalCallback);
+}
+
+function parseWords(words, finalCallback) {
     words.forEach(function (word) {
         var root = natural.PorterStemmerRu.stem(word);
         if (!roots[root]) {
@@ -121,8 +123,9 @@ function top(n) {
                 }
             }
             sortedRoots = sortedRoots.sort(sortCount);
+
             for (var i = 0; i < n; i++) {
-                console.log(sortedRoots[i].words[0] + '  ' + sortedRoots[i].count);
+               console.log(sortedRoots[i].words[0] + '  ' + sortedRoots[i].count);
             }
         }
     });
@@ -145,4 +148,3 @@ function count(word) {
 function sortCount(a, b) {
     return b.count - a.count;
 }
-
