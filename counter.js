@@ -12,10 +12,18 @@ const NUMBER_TASKS = 10;
 
 var JSTasks;
 var VerstkaTasks;
+var tasks;
+// Проверка - скачены ли таски
 var downloaded = false;
+// Кэш: слово - корень
+var cache = {};
+// Использованные корни
+var usedRoots = [];
 
 // С помощью этой супер штуки мы разберем слово и получим его корень
-const ONLINE_DICT_URI = 'http://vnutrislova.net/разбор/по-составу/';
+const ONLINE_DICT_HOST = 'http://vnutrislova.net';
+const ONLINE_DICT_PATH = '/разбор/по-составу/';
+
 // Регвыр для вытаскивания корня
 const ROOT_REGEXP = new RegExp('корень \\[(.*?)\\]');
 
@@ -58,7 +66,7 @@ function readFile(fileName) {
  * @param {string} addr
  * @return {string} content
  */
-function doRequest(typeReq, addr) {
+function doRequestSync(typeReq, addr) {
     var content = undefined;
 
     try {
@@ -104,7 +112,7 @@ function parseAPIResponse(res) {
  * @return {string} parsedContent
  */
 function getReadme(prefix, number) {
-    var content = doRequest('GET', GIT_HUB_API + '/repos/' + MAIN_REPO + '/' + prefix + number +
+    var content = doRequestSync('GET', GIT_HUB_API + '/repos/' + MAIN_REPO + '/' + prefix + number +
         '/readme' + '?access_token=' + KEY);
 
     return parseAPIResponse(content);
@@ -153,7 +161,7 @@ function removeSymbols(list, text, word) {
             if (item.length <= 3) {
                 newText = newText.replace(new RegExp('\\s' + item + '\\s', 'g'), ' ');
             } else {
-                newText = newText.replace(new RegExp(item + '\\s', 'g'), '');
+                newText = newText.replace(new RegExp(item + '\\s', 'g'), ' ');
             }
         } else {
             newText = newText.replace(new RegExp('\\' + item, 'g'), ' ');
@@ -186,13 +194,14 @@ function smartAnalyzer(text) {
 
 /**
  * @author Savi
- * Метод, который делает запрос к онлайн словарю и возвращает корень слова.
+ * Метод, который делает (синхронный) запрос к онлайн словарю и возвращает корень слова.
  * @param {string} word
  * @return {string} root
  */
 function getWordRoot(word) {
     var root = word;
-    var res = doRequest('GET', ONLINE_DICT_URI + word);
+
+    var res = doRequestSync('GET', ONLINE_DICT_HOST + ONLINE_DICT_PATH + word);
 
     if ((res !== undefined) && (ROOT_REGEXP.exec(res) !== null)) {
         root = ROOT_REGEXP.exec(res)[1];
@@ -203,57 +212,54 @@ function getWordRoot(word) {
 
 /**
  * @author Savi
- * Метод, который получает на вход слово (Возможно корень)
- * и подсчитывает все его вхождения, учитывая однокоренные слова.
+ * Метод, который получает на вход слово (возможно корень) и подсчитывает все его вхождения,
+ * учитывая однокоренные слова.
  * @param {string} word
- * @param {string} rootArg
+ * @param {string} argRoot
  * @param {boolean} top
  * @return {object} result
  */
-module.exports.count = function (word, rootArg, top) {
+module.exports.count = function (word, argRoot, top) {
     var LCWord = word.toLowerCase();
     var root;
 
-    var result = 0;
-
-    if (rootArg === undefined) {
-        root = getWordRoot(LCWord);
+    if (argRoot !== undefined) {
+        root = argRoot;
+        cache[LCWord] = root;
+        usedRoots.push(root);
     } else {
-        root = rootArg;
+        root = getWordRoot(LCWord);
+        cache[LCWord] = root;
+        usedRoots.push(root);
     }
 
-    var rootRegExp = new RegExp(root);
+    var tempRoot;
+
+    var result = 0;
 
     if (!downloaded) {
         downloaded = true;
         JSTasks = getTasks(JS_TASKS_PREFIX);
         VerstkaTasks = getTasks(VERSTKA_TASKS_PREFIX);
+        tasks = mergeDicts(JSTasks, VerstkaTasks);
     }
 
-    for (var i = 0; i < NUMBER_TASKS; i++) {
-        JSTasks[i].forEach(function (item) {
-            // По хорошему мы должны сравнивать корни слов... Но это очень-очень долго...
-            //var itemRoot = getWordRoot(item);
-            //if (root === itemRoot) {
-            //    result[LCWord]++;
-            //}
-            // Проанализируем просто подслово
-            if (rootRegExp.test(item)) {
-                result++;
-            }
-        });
-        VerstkaTasks[i].forEach(function (item) {
-            // По хорошему мы должны сравнивать корни слов... Но это очень-очень долго...
-            //var itemRoot = getWordRoot(item);
-            //if (root === itemRoot) {
-            //    result[LCWord]++;
-            //}
-            // Проанализируем просто подслово
-            if (rootRegExp.test(item)) {
-                result++;
+    for (var i = 0; i < Object.keys(tasks).length; i++) {
+        tasks[i].forEach(function (item) {
+            if (item in cache) {
+                if (cache[item] === root) {
+                    result++;
+                }
+            } else {
+                tempRoot = getWordRoot(item);
+                cache[item] = tempRoot;
+                if (tempRoot === root) {
+                    result++;
+                }
             }
         });
     }
+
     if (!top) {
         console.log(result);
     }
@@ -271,24 +277,20 @@ module.exports.top = function (n) {
         downloaded = true;
         JSTasks = getTasks(JS_TASKS_PREFIX);
         VerstkaTasks = getTasks(VERSTKA_TASKS_PREFIX);
+        tasks = mergeDicts(JSTasks, VerstkaTasks);
     }
 
     var result = {};
-    var usedRoots = [];
     var tempRoot;
 
-    for (var i = 0; i < NUMBER_TASKS; i++) {
-        JSTasks[i].forEach(function (item) {
-            tempRoot = getWordRoot(item);
-            if (usedRoots.indexOf(tempRoot) === -1) {
-                usedRoots.push(tempRoot);
-                result[item] = module.exports.count(item, tempRoot, true);
+    for (var i = 0; i < Object.keys(tasks).length; i++) {
+        tasks[i].forEach(function (item) {
+            if (!(item in cache)) {
+                tempRoot = getWordRoot(item);
+            } else {
+                tempRoot = cache[item];
             }
-        });
-        VerstkaTasks[i].forEach(function (item) {
-            tempRoot = getWordRoot(item);
             if (usedRoots.indexOf(tempRoot) === -1) {
-                usedRoots.push(tempRoot);
                 result[item] = module.exports.count(item, tempRoot, true);
             }
         });
@@ -304,6 +306,29 @@ module.exports.top = function (n) {
 
     prettyPrint(sortableRes.reverse().slice(0, n));
 };
+
+/**
+ * @author Savi
+ * Метод, который производит слияние двух словарей.
+ * @param dictF
+ * @param dictS
+ * @returns {object} dict
+ */
+function mergeDicts(dictF, dictS) {
+    var dict = {};
+    var counter = 0;
+
+    for (var keyF in dictF) {
+        dict[counter] = dictF[keyF];
+        counter++;
+    }
+    for (var keyS in dictS) {
+        dict[counter] = dictS[keyS];
+        counter++;
+    }
+
+    return dict;
+}
 
 /**
  * @author Savi
