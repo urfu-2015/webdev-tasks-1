@@ -125,7 +125,7 @@ function top(n) {
             sortedRoots = sortedRoots.sort(sortCount);
 
             for (var i = 0; i < n; i++) {
-               console.log(sortedRoots[i].words[0] + '  ' + sortedRoots[i].count);
+                console.log(sortedRoots[i].words[0] + '  ' + sortedRoots[i].count);
             }
         }
     });
