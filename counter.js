@@ -148,3 +148,8 @@ function count(word) {
 function sortCount(a, b) {
     return b.count - a.count;
 }
+
+module.exports = {
+    count: count,
+    top: top
+};
