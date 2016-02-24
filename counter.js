@@ -11,13 +11,13 @@ const BLACKLIST = new Set(fs.readFileSync('blacklist.txt'));
 function getWordRoot(word) {
     //var url = MORPHEMEONLINE + 'б/бабушка';
     var url = MORPHEMEONLINE + word[0] + '/' + word;
-    request(encodeURI(url), function(err, res, body) {
+    request(encodeURI(url), function (err, res, body) {
         $ = cheerio.load(body);
         return $('.root').text();
     });
 }
 
-module.exports.count = function(word) {
+module.exports.count = function (word) {
 
 };
 module.exports.top = function (n) {
@@ -42,7 +42,7 @@ function getReadme(courseType, taskIndex) {
             'User-Agent': 'request'
         }
     };
-    return request(gitRequest, function(err, res, body) {
+    return request(gitRequest, function (err, res, body) {
         var json = JSON.parse(body);
         console.log(Buffer(json['content'], json['encoding']).toString('utf-8'));
     });
