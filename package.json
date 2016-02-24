@@ -1,10 +1,15 @@
 {
-  "private": true,
-  "dependencies": {
-    "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
-  },
-  "scripts": {
-    "lint": "jscs ."
-  }
+    "private": true,
+    "dependencies": {
+        "async": "^1.5.2",
+        "fs": "0.0.2",
+        "jscs": "^2.2.1",
+        "mocha": "^2.3.3",
+        "request": "^2.69.0",
+        "stream": "0.0.2"
+    },
+    "scripts": {
+        "lint": "jscs .",
+        "test": "npm run lint",
+    }
 }

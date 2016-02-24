@@ -86,5 +86,6 @@
     },
     "validateIndentation": 4,
     "validateParameterSeparator": ", ",
-    "validateQuoteMarks": "'"
+    "validateQuoteMarks": "'",
+    "maxErrors": 100
 }
