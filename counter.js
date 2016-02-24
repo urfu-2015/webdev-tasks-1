@@ -23,12 +23,11 @@ module.exports.count = function (word) {
 function doRequest(callback) {
     request(getOptions(reposURL), function (error, response, body) {
         if (!error && response.statusCode == 200) {
-            var repos = JSON.parse(body);
             var promises = [];
-            repos.forEach(function (repo) {
+            body.forEach(function (repo) {
                 if (repo.name.indexOf('tasks') != -1) {
                     var repoURL = 'https://api.github.com/repos/urfu-2015/';
-                    var readmeURL = repoURL + repo.name + '/contents/README.md?ref=master';
+                    var readmeURL = repoURL + repo.name + '/readme';
                     promises.push(getReadMe(readmeURL));
                 }
             });
@@ -46,16 +45,16 @@ function getOptions(reqURL) {
         headers: {
             'User-Agent': 'request',
             authorization: token
-        }
+        },
+        json: true
     };
 };
 
 function getReadMe(url) {
     return new Promise(function (resolve, reject) {
         request(getOptions(url), function (error, response, body) {
-            if (!error && response.statusCode == 200) {
-                var json = JSON.parse(body);
-                var text = new Buffer(json.content, 'base64').toString('utf-8');
+            if (!error && response.statusCode === 200) {
+                var text = new Buffer(body.content, 'base64').toString('utf-8');
                 resolve(text);
             } else {
                 reject(error);
