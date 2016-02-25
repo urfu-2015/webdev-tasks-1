@@ -85,6 +85,7 @@ function getStat(text, callback) {
     });
     callback(null, roots);
 }
+
 function main(callback) {
     async.waterfall(
         [
@@ -100,30 +101,29 @@ function main(callback) {
     );
 }
 
-module.exports.count = function (word) {
+module.exports.count = function (word, callback) {
+
     var root = natural.PorterStemmerRu.stem(word);
     var count = function (err, words) {
-        console.log(words[root]);
+        callback(words[root]);
     };
     main(count);
 };
 
-module.exports.top = function (count) {
+module.exports.top = function (count, callback) {
 
     var top = function (err, words) {
         var keys = Object.keys(words);
         keys.sort(function (k1, k2) {
             return words[k2].counter - words[k1].counter;
         });
+        var result = [];
         if (!err) {
             for (var i = 0; i < count; i++) {
-                console.log(words[keys[i]]);
+                result.push(words[keys[i]]);
             }
         }
-
+        callback(result);
     };
     main(top);
 };
-
-module.exports.count('котики');
-module.exports.top(10);
