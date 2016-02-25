@@ -1,3 +1,4 @@
+'use strict';
 var fs = require('fs');
 var oauth_token = fs.readFileSync('./key.txt', 'utf-8');
 var async = require('async');
@@ -69,7 +70,7 @@ var getStats = function (word, type, resultCallback) {
                 var reposArgs = [];
                 var bodyJSON = JSON.parse(body);
                 for (var repoId = 0; repoId < bodyJSON.length; repoId++) {
-                    if (bodyJSON[repoId].name.indexOf('verstka-tasks-7') != -1) {
+                    if (bodyJSON[repoId].name.indexOf('tasks') != -1) {
                         reposArgs.push(repoId);
                     }
                 }
