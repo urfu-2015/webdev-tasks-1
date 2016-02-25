@@ -2,16 +2,17 @@ var fs = require('fs');
 var oauth_token = fs.readFileSync('./key.txt', 'utf-8');
 var async = require('async');
 var forEach = require('async-foreach').forEach;
-var Promise = require('bluebird');
-var request = Promise.promisifyAll(require('request'));
+var request = require('request');
 
-function printCountCallback(word, objectResult) {
+function printCountCallback(word, objectResult, resultCallback) {
+    var resultValue;
     for (var i = 0;i < objectResult.length;i++) {
         if (objectResult[i][0] != '') {
             var mayInRoot = objectResult[i][1];
             for (var j = 0; j < mayInRoot.length; j++) {
                 if (word == mayInRoot[j]) {
-                    console.log(mayInRoot.length);
+                    resultValue = mayInRoot.length;
+                    resultCallback(resultValue);
                     break;
                 }
             }
@@ -19,7 +20,7 @@ function printCountCallback(word, objectResult) {
     }
 }
 
-function printTopCallback(count, objectResult) {
+function printTopCallback(count, objectResult, resultCallback) {
     var results = [];
     while (count != 0) {
         var topLength = -1;
@@ -52,10 +53,10 @@ function printTopCallback(count, objectResult) {
         }
         results.push([topLength, nowRoot, resultWord]);
     }
-    console.log(results);
+    resultCallback(results);
 }
 
-var getHardWork = function (word, type) {
+var getStats = function (word, type, resultCallback) {
     var glResult;
     async.waterfall([
         function getRepos(callback) {
@@ -68,7 +69,7 @@ var getHardWork = function (word, type) {
                 var reposArgs = [];
                 var bodyJSON = JSON.parse(body);
                 for (var repoId = 0; repoId < bodyJSON.length; repoId++) {
-                    if (bodyJSON[repoId].name.indexOf('tasks') != -1) {
+                    if (bodyJSON[repoId].name.indexOf('verstka-tasks-7') != -1) {
                         reposArgs.push(repoId);
                     }
                 }
@@ -156,19 +157,19 @@ var getHardWork = function (word, type) {
     ],
         function (err, returnValue) {
             if (type == 'count') {
-                printCountCallback(word, returnValue);
+                printCountCallback(word, returnValue, resultCallback);
             }
             if (type == 'top') {
-                printTopCallback(word, returnValue);
+                printTopCallback(word, returnValue, resultCallback);
             }
         });
 };
 
 
-module.exports.count = function (word) {
-    getHardWork(word, 'count');
+module.exports.count = function (word, resultCallback) {
+    getStats(word, 'count', resultCallback);
 };
 
-module.exports.top = function (count) {
-    getHardWork(count, 'top');
+module.exports.top = function (count, resultCallback) {
+    getStats(count, 'top', resultCallback);
 };
