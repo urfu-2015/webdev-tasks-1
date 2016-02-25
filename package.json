@@ -2,9 +2,25 @@
   "private": true,
   "dependencies": {
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "request": "^2.69.0",
+    "sync-request": "^3.0.0"
   },
   "scripts": {
     "lint": "jscs ."
-  }
+  },
+  "name": "webdev-tasks-1",
+  "description": "Код должен проходить валидацию JSCS.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dodo888/webdev-tasks-1.git"
+  },
+  "author": "Vladimir Smirnov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Dodo888/webdev-tasks-1/issues"
+  },
+  "homepage": "https://github.com/Dodo888/webdev-tasks-1#readme"
 }
