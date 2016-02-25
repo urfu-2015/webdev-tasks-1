@@ -1,14 +1,12 @@
 {
   "private": true,
   "dependencies": {
-    "async": "^1.5.2",
     "co": "^4.6.0",
     "co-request": "^1.0.0",
     "fs": "0.0.2",
     "jscs": "^2.2.1",
     "mocha": "^2.3.3",
-    "natural": "^0.2.1",
-    "request": "^2.69.0"
+    "natural": "^0.2.1"
   },
   "scripts": {
     "lint": "jscs .",
