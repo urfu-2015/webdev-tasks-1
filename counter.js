@@ -6,32 +6,6 @@ var reRoot = /корень \[([а-я]*)]/i;
 var result = {};
 var roots = [];
 
-function getRoot(word) {
-    var res_count = 0;
-    async.series([
-        request({
-            url: 'http://vnutrislova.net/' + encodeURI('разбор/по-составу/') + encodeURI(req_arg),
-            method: 'GET'
-        },
-        function (err, res, body) {
-            var root;
-            //console.log(body);
-            if (!err && res.statusCode === 200) {
-                root = body.match(reRoot);
-                //console.log(root[1]);
-                if (root && root[1] !== undefined) {
-                    console.log(root[1]);
-                    res_count += root[1];
-                    }
-                }
-            }
-        ),
-        function ret() {
-            return res_count;
-        }
-    ]);
-}
-
 function getData(req_arg, req) {
 
     async.waterfall([
@@ -125,17 +99,36 @@ function getData(req_arg, req) {
         },
         function fin(callback) {
             if (req === 'count') {
-                async.waterfall([
-                    function getRoot(callback) {
-                        var res_count = 0;
-                        callback(getRoot(req_arg));
+                request({
+                        url: 'http://vnutrislova.net/' + encodeURI('разбор/по-составу/') + encodeURI(req_arg),
+                        method: 'GET'
                     },
-                    function printer(root) {
-                        console.log(result[root]);
+
+                    function (err, res, body) {
+                        var root;
+                        if (!err && res.statusCode === 200) {
+                            root = body.match(reRoot);
+                            if (root && root[1] !== undefined) {
+                                console.log(req_arg, result[root[1]].length);
+                            }
+                        }
+                        callback(null);
                     }
-                ]);
+                )
             } else if (req === 'top') {
-                console.log(result[req_arg]);
+                var sort_mas = [];
+                for (var root in result) {
+                    sort_mas.push([root, result[root].length]);
+                }
+
+                sort_mas.sort(function(a, b) {
+                    return b[1] - a[1];
+                });
+                var i = 0;
+                while (i < req_arg) {
+                    console.log(result[sort_mas[i][0]][0], sort_mas[i][1]);
+                    i += 1;
+                }
             }
         }
     ]);
