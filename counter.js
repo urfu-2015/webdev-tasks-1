@@ -5,13 +5,12 @@ var async = require('async');
 
 const token = fs.readFileSync('key.txt', 'utf-8');
 
-var prepositions = ['без', 'близ', 'в', 'во', 'вместо', 'вне', 'для', 'до', 'за', 'из', 'изо',
-    'из-за', 'из-под', 'к', 'ко', 'кроме', 'между', 'меж', 'на',
-    'над', 'надо', 'о', 'об', 'обо', 'от', 'ото', 'перед', 'передо', 'пред', 'предо',
-    'пo', 'под', 'подо', 'при', 'про', 'ради', 'с', 'со', 'сквозь', 'среди',
-    'у', 'через', 'но', 'а', 'или', 'и', 'не', 'либо', 'если'];
+var exclude = getPrepositions();
 
-
+function getPrepositions() {
+    var file = fs.readFileSync('exclude.txt', 'utf-8');
+    return file.split('\r\n');
+}
 
 
 var rootDictionary = [];
@@ -28,35 +27,43 @@ async.waterfall([
             }
         }
         rootDictionary.sort(function (a, b) {
-            return a[1].num  - b[1].num;
+            return b[1].num  - a[1].num;
         });
-        //console.log(rootDictionary);
         callback(null);
+    },
+    function (callback) {
+        module.exports.top = function (n) {
+            return rootDictionary.slice(0, n);
+        };
+
+        module.exports.count = function (word) {
+            var root;
+            request('http://vnutrislova.net/' + encodeURI('разбор/по-составу/' + word),
+                function (err, res, body) {
+                    if (!err && res.statusCode == 200 && body.indexOf('span class="root">') !== -1) {
+                        root = body.substring(body.indexOf('span class="root">'));
+                        root = root.substring(18, root.indexOf('<'));
+                    } else {
+                        root = word;
+                    }
+                    var result = rootDictionary.slice().filter(function (elem) {
+                        return elem[0] == root;
+                    });
+                    if (result.length == 0) {
+                        return 0;
+                    }
+                    console.log(result);
+                    return result[0][1].num;
+
+                }
+            );
+
+        };
+        callback();
     }
-], function (err) {});
+], function () {
 
-
-module.exports.top = function (n) {
-    return rootDictionary.slice(0, n);
-};
-
-module.exports.count = function (word) {
-    var root;
-    request('http://vnutrislova.net/' + encodeURI('разбор/по-составу/' + word),
-        function (err, res, body) {
-            if (!err && res.statusCode == 200 && body.indexOf('span class="root">') !== -1) {
-                root = body.substring(body.indexOf('span class="root">'));
-                root = root.substring(18, root.indexOf('<'));
-            } else {
-                root = word;
-            }
-            if (rootDictionary.hasOwnProperty(root)) {
-                return rootDictionary[root].num
-            } else {
-                return 0
-            }
-        });
-};
+});
 
 
 function receiveRepoNames(callback) {
@@ -125,7 +132,7 @@ function workDictionary(words, callback) {
     for (var i = 0; i < words.length; i++) {
         for (var j = 0; j< words[i].length; j++) {
             word = words[i][j];
-            if (word.length > 0 && prepositions.indexOf(word) == -1) {
+            if (word.length > 0 && exclude.indexOf(word) == -1) {
                 if (!dictionary.hasOwnProperty(word)) {
                     dictionary[word] = 1;
                 } else {
