@@ -4,28 +4,14 @@ var RussianStemmer = require('snowball-stemmer.jsx/dest/russian-stemmer.common.j
 
 var key = require('fs').readFileSync('key.txt', 'utf-8');
 
-var urls = ['https://api.github.com/repos/urfu-2015/webdev-tasks-1/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-1/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-2/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-3/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-4/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-5/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-6/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-7/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-8/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-9/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/verstka-tasks-10/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-1/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-2/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-3/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-4/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-5/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-6/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-7/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-8/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-9/readme?access_token=' + key,
-    'https://api.github.com/repos/urfu-2015/javascript-tasks-10/readme?access_token=' + key
-];
+var urls = [];
+var jsPattern = 'https://api.github.com/repos/urfu-2015/javascript-tasks-';
+var htmlPattern = 'https://api.github.com/repos/urfu-2015/verstka-tasks-';
+for (var i = 1; i <= 10; i++) {
+    var str = i + '/readme?access_token=' + key;
+    urls.push(jsPattern + str);
+    urls.push(htmlPattern + str);
+}
 
 var findTop = function (data) {
     var words = [];
