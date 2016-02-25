@@ -29,12 +29,12 @@ function init(callback) {
         }
     };
     request(mainRequest, function (error, response, body) {
-        if (!error && response.statusCode == 200) {
+        if (!error && response.statusCode === 200) {
             var repos = JSON.parse(body);
             var names = [];
             for (var i = 0; i < repos.length; i++) {
-                if (repos[i].name.indexOf('verstka-tasks') != -1 ||
-                    repos[i].name.indexOf('javascript-tasks') != -1) {
+                if (repos[i].name.indexOf('verstka-tasks') !== -1 ||
+                    repos[i].name.indexOf('javascript-tasks') !== -1) {
                     names.push(repos[i].name);
                 }
             }
@@ -45,7 +45,7 @@ function init(callback) {
                         return callback(error);
                     }
                     calls++;
-                    if (calls == names.length) {
+                    if (calls === names.length) {
                         return callback(null);
                     }
                 });
@@ -65,7 +65,7 @@ function processingREADME(name, callback) {
         }
     };
     request(getRequest, function (error, response, body) {
-        if (!error && response.statusCode == 200) {
+        if (!error && response.statusCode === 200) {
             processingText(JSON.parse(body).content);
             callback(null);
         } else {
@@ -84,7 +84,7 @@ function processingText(encodedText) {
     var cleanText = [];
     decodeText = tokenizer.tokenize(decodeText);
     decodeText.forEach(function (word) {
-        if (stopWords.indexOf(word) == -1) {
+        if (stopWords.indexOf(word) === -1) {
             cleanText.push(word);
         }
     });
@@ -99,7 +99,7 @@ function addToFrequencyArray(wordArray) {
         for (var j = 0; j < FREQUENCY_DICT.length; j++) {
             if (natural.JaroWinklerDistance(fullWord, FREQUENCY_DICT[j].key) > 0.85) {
                 FREQUENCY_DICT[j].count += 1;
-                if (FREQUENCY_DICT[j].fullWords.indexOf(fullWord) == -1) {
+                if (FREQUENCY_DICT[j].fullWords.indexOf(fullWord) === -1) {
                     FREQUENCY_DICT[j].fullWords.push(fullWord);
                 }
                 added = true;
