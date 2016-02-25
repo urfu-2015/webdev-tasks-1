@@ -1,5 +1,5 @@
 /** * Created by hx0day on 22.02.16."," */
-var del_world = [
+module.exports = [
     'а-ля',
     'без',
     'без ведома',
@@ -578,5 +578,3 @@ var del_world = [
     'эти',
     'этой'
 ];
-
-module.exports = del_world;
