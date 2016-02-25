@@ -1,12 +1,10 @@
-/**
- * Created by hx0day on 21.02.16.
- */
 const fs = require('fs');
-const request = require('request');
+const co = require("co");
+const r = require("co-request");
 const natural = require('natural');
 const all_word = require('./word.js');
-const async = require('async');
 const oauth_token = fs.readFileSync('.key', 'utf-8');
+
 
 function getRequestDataGitAPI(query) {
     return {
@@ -18,54 +16,17 @@ function getRequestDataGitAPI(query) {
     };
 }
 
-function getRepoUrl(_, body, callback) {
-    var dataJSON = JSON.parse(body);
-    var all_repo_url = [];
-    dataJSON.forEach(function (repo) {
-        if (repo.name.indexOf('tasks') != -1) {
-            var url = 'repos/' + repo.full_name + '/readme';
-            all_repo_url.push(url.replace(/\s/, ''));
-        }
+function clear_text(data) {
+    var body = data.body;
+    body = body.replace(/[^А-Яа-яЁё\- ]/g, ' ').toLowerCase();
+    all_word.forEach(function (world) {
+        body = body.replace(new RegExp(' ' + world + ' ', 'g'), ' ');
     });
-    callback(null, all_repo_url);
+    body = body.replace(/ [-,]{1,} /g, ' ').replace(/\s+/g, ' ');
+    return body;
 }
 
-function getAllReadmeUrl(all_repo_url, callback) {
-    async.map(all_repo_url, function (url, callback) {
-        request(
-            getRequestDataGitAPI(url),
-            function (error, response, body) {
-                if (!error && response.statusCode == 200) {
-                    var dataJSON = JSON.parse(body);
-                    callback(null, dataJSON.download_url);
-                } else {
-                    callback(error || response.statusCode);
-                }
-            });
-    }, callback);
-}
-
-function getAllWords(readme_url, callback) {
-    async.map(readme_url, function (url, callback) {
-        request(url,
-            function (error, response, body) {
-                if (!error && response.statusCode == 200) {
-                    body = body.replace(/[^А-Яа-яЁё\- ]/g, ' ').toLowerCase();
-                    all_word.forEach(function (world) {
-                        body = body.replace(new RegExp(' ' + world + ' ', 'g'), ' ');
-                    });
-                    body = body.replace(/ [-,]{1,} /g, ' ').replace(/\s+/g, ' ');
-
-                    callback(null, body);
-
-                } else {
-                    callback(error || response.statusCode);
-                }
-            });
-    }, callback);
-}
-
-function getStat(text, callback) {
+function getStat(text) {
     var all_world = text.toString().split(' ');
     var roots = {};
     all_world.forEach(function (item) {
@@ -83,46 +44,51 @@ function getStat(text, callback) {
             }
         }
     });
-    callback(null, roots);
+    return roots;
 }
 
-function main(callback) {
-    async.waterfall(
-        [
-            function (callback) {
-                return request(getRequestDataGitAPI('orgs/urfu-2015/repos'), callback);
-            },
-            getRepoUrl,
-            getAllReadmeUrl,
-            getAllWords,
-            getStat
-        ],
-        callback
-    );
-}
+var main = function (callback) {
+    co(
+        function *() {
+            var data = yield r(getRequestDataGitAPI('orgs/urfu-2015/repos'));
+            var dataJSON = JSON.parse(data.body);
+            var readme = '';
+            var i = 0;
+            for (i = 0; i < dataJSON.length; i++) {
+                var repo = dataJSON[i].full_name;
+                if (repo.indexOf('tasks') != -1) {
+
+                    var data_repo = yield r(getRequestDataGitAPI('repos/' + repo + '/readme'));
+                    var data_json_repo = JSON.parse(data_repo.body);
+
+                    readme += clear_text(yield r(data_json_repo.download_url));
+                }
+            }
+            return getStat(readme);
+        }()
+    ).then(callback);
+};
 
 module.exports.count = function (word, callback) {
-
     var root = natural.PorterStemmerRu.stem(word);
-    var count = function (err, words) {
+    var count = function (words) {
         callback(words[root]);
     };
     main(count);
 };
 
 module.exports.top = function (count, callback) {
-
-    var top = function (err, words) {
+    var top = function (words) {
         var keys = Object.keys(words);
         keys.sort(function (k1, k2) {
             return words[k2].counter - words[k1].counter;
         });
         var result = [];
-        if (!err) {
-            for (var i = 0; i < count; i++) {
-                result.push(words[keys[i]]);
-            }
+
+        for (var i = 0; i < count; i++) {
+            result.push(words[keys[i]]);
         }
+
         callback(result);
     };
     main(top);
