@@ -12,7 +12,6 @@ const MORPHEME_ONLINE = 'http://www.morphemeonline.ru/';
 const VNUTRI_SLOVA = 'http://vnutrislova.net/разбор/по-составу/';
 const BLACKLIST = new Set(JSON.parse(fs.readFileSync('blacklist.json')));
 const ROOTS_CACHE = new Map();
-const TASK_COUNT = 10;
 
 function downloadTaskReadmes(taskCount) {
     const JS_TASKS = 'javascript-tasks-';
@@ -40,7 +39,7 @@ function getReadme(courseType, taskIndex) {
 function getWordsByRoot(taskCount) {
     var tasks = downloadTaskReadmes(taskCount);
     var roots = new Map();
-    tasks.forEach((taskText) => {
+    tasks.forEach(taskText => {
         var words = getWordsFromText(taskText);
         words.forEach(word => {
             var root = getWordRoot(word);
@@ -54,11 +53,16 @@ function getWordsByRoot(taskCount) {
     return roots;
 }
 
-function buildWordsByRootAsync(roots, tasksCount) {
+function fillWordsByRootAsync(roots, tasksCount) {
     var tasks = downloadTaskReadmes(tasksCount);
     var words = getWordsFromText(tasks);
     console.log("Total words count: " + words.length);
-    return Promise.all(words.map(w => buildRootsAsync(w, roots)));
+    //var promises = linq
+    //    .from(words)
+    //    .select((w, i) => fillRootsAsync(w, roots, i))
+    //    .toArray();
+    //return Promise.all(promises);
+    return Promise.all(words.map(w => fillRootsAsync(w, roots)));
 }
 
 var urlBuilders = {};
@@ -71,6 +75,7 @@ siteParsers[MORPHEME_ONLINE] = body => {
 };
 
 siteParsers[VNUTRI_SLOVA] = body => {
+
     var $ = cheerio.load(body);
     var root = $('.most-rated > p > span').text();
     root = root.substring(root.indexOf('корень ') + 8);
@@ -78,26 +83,24 @@ siteParsers[VNUTRI_SLOVA] = body => {
     return root;
 };
 
-function buildRootsAsync(word, roots, host) {
+//function fillRootsAsync(word, roots, host) {
+function fillRootsAsync(word, roots, host) {
     return new Promise(resolve => {
         host = host || VNUTRI_SLOVA;
-        if (ROOTS_CACHE.has(word)) {
-            return ROOTS_CACHE.get(word);
+        if (ROOTS_CACHE.has(natural.PorterStemmer.stem(word))) {
+            return ROOTS_CACHE.get(natural.PorterStemmer.stem(word));
         }
         var url = urlBuilders[host](word);
         request(encodeURI(url), function (error, response, body) {
             var root;
             try {
                 root = siteParsers[host](body);
-                if (body.indexOf('Нет такой страницы') > 0) {
-                    root = getWordRoot(word, roots, MORPHEME_ONLINE);
-                }
-                if (root == '')
-                    root = word;
-                ROOTS_CACHE.set(word, root);
+                if (body.indexOf('Нет такой страницы') > 0 || root == '')
+                    root = natural.PorterStemmer.stem(word);
             } catch (e) {
                 root = natural.PorterStemmer.stem(word);
             }
+            ROOTS_CACHE.set(natural.PorterStemmer.stem(word), root);
             if (roots.has(root)) {
                 roots.get(root).push(word);
             } else {
@@ -125,7 +128,7 @@ function getWordRoot(word, host) {
 
 getWordsFromText = text =>
     text
-        .split(/[ A-Za-z!`–.│#№«\\»{}?|,—+-_\*1234567890'"\[\]<>\(\)\n\r]/)
+        .split(/[ A-Za-z!`–.│@$©&”#“№«\\»{}?|,—+-_\*1234567890'"\[\]<>\(\)\n\r]/)
         .filter(item => item != '')
         .filter(item => !BLACKLIST.has(item));
 
@@ -148,19 +151,21 @@ top = n =>
         .orderByDescending(pair => pair[1].length)
         .take(n)
         .select(pair => [pair[1][0], pair[1].length])
-        //.select(pair => getMostOccurringElement(pair[1]))
         .toArray();
 
 countAsync = word => {
     var roots = new Map();
-    buildWordsByRootAsync(roots, TASK_COUNT).then(() => {
-        console.log(roots.get(getWordRoot(word)).length);
+    var root = getWordRoot(word, VNUTRI_SLOVA);
+    fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
+        console.log(roots);
+        console.log(roots.get(root).length);
         console.log(new Date());
     });
 };
+
 topAsync = n => {
     var roots = new Map();
-    buildWordsByRootAsync(roots, TASK_COUNT).then(() => {
+    fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
         linq
             .from(list(roots.entries()))
             .orderByDescending(pair => pair[1].length)
@@ -187,6 +192,10 @@ function list(iterator) {
     return res;
 }
 
+const TASK_COUNT = 1;
+
 console.log(new Date());
 //topAsync(10);
-countAsync("задание");
+//countAsync("пользователь");
+countAsync("скрипт");
+//countAsync("задание");
