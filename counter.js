@@ -9,10 +9,6 @@ const OATH_TOKEN = fs.readFileSync('key.txt', 'utf-8');
 const GITHUB_API = 'https://api.github.com';
 var GET_ROOT_SITE = 'http://vnutrislova.net/' + encodeURI('разбор/по-составу/');
 var REGEXP = /[^А-Яа-яёЁ]+/g;
-const stopRepos = ['urfu-2015/verstka-lectures', 'urfu-2015/javascript-lectures',
-    'urfu-2015/guides', 'urfu-2015/javascript-slides',
-    'urfu-2015/verstka-slides', 'urfu-2015/html-test-suite', 'urfu-2015/rebase-example-repo',
-    'urfu-2015/hrundel-board', 'urfu-2015/webdev-lectures', 'urfu-2015/webdev-slides'];
 
 module.exports.top = function (n) {
     getStatistics(n, 'top');
@@ -37,7 +33,7 @@ function getStatistics(req, type) {
              *
              * @param callback
              */
-                function getRepos(callback) {
+                function (callback) {
                 request({
                         url: GITHUB_API + '/orgs/urfu-2015/repos?access_token=' + OATH_TOKEN,
                         method: 'GET',
@@ -59,10 +55,10 @@ function getStatistics(req, type) {
              * @param reposList
              * @param callback
              */
-                function getAllReadme(reposList, callback) {
+                function (reposList, callback) {
                 var reposContent = '';
                 reposList = reposList.filter(function (repos) {
-                    return stopRepos.indexOf(repos) === -1;
+                    return repos.indexOf('tasks') !== -1;
                 });
 
                 async.forEach(reposList, function (repos, next) {
@@ -81,7 +77,7 @@ function getStatistics(req, type) {
                             }
                         }
                     );
-                }, function (err, content) {
+                }, function (err) {
                     callback(null, reposContent);
                 });
             },
@@ -92,7 +88,7 @@ function getStatistics(req, type) {
              * @param reposContent
              * @param callback
              */
-                function splitAllContent(reposContent, callback) {
+                function (reposContent, callback) {
                 reposContent = reposContent.toLowerCase().split(REGEXP);
                 callback(null, reposContent);
             },
@@ -102,10 +98,11 @@ function getStatistics(req, type) {
              * @param reposContent
              * @param callback
              */
-                function doCount(reposContent, callback) {
+                function (reposContent, callback) {
                 // wordsRoots - для каждого слова хранится его корень
                 var wordsRoots = {};
-                /* countRepetitions[root] {root, count, word} - структура, для хранения повторений.
+                /* countRepetitions[root] {root, count, word} - структура,
+                 для хранения повторений.
                  count - число повторений, word - первое слово с этим коренм.
                  Его выведем в статистику
                  */
@@ -116,30 +113,24 @@ function getStatistics(req, type) {
                             method: 'GET'
                         },
                         function (err, res, body) {
+                            var rootIndex = -1;
+                            var currentRoot = word;
                             if (stopWords.indexOf(word) === -1 && word !== '') {
                                 if (!err && res.statusCode === 200) {
                                     body = body.split(' ');
-                                    var rootIndex = body.indexOf('корень');
+                                    rootIndex = body.indexOf('корень');
                                     if (rootIndex !== -1) {
-                                        if (wordsRoots[word] === undefined) {
-                                            var currentRoot = body[rootIndex + 1].
-                                                replace(REGEXP, '');
-                                            if (countRepetitions[currentRoot] === undefined) {
-                                                countRepetitions[currentRoot] =
-                                                {'root': currentRoot, 'count': 0, 'word': word};
-                                            }
-                                            wordsRoots[word] = currentRoot;
-                                        }
+                                        currentRoot = body[rootIndex + 1].replace(REGEXP, '');
                                     }
                                 }
                                 if (wordsRoots[word] === undefined) {
-                                    if (countRepetitions[word] === undefined) {
-                                        countRepetitions[word] = { 'root': word, 'count': 0,
-                                            'word': word};
+                                    if (countRepetitions[currentRoot] === undefined) {
+                                        countRepetitions[currentRoot] =
+                                        {root: currentRoot, count: 0, word: word};
                                     }
-                                    wordsRoots[word] = word;
+                                    wordsRoots[word] = currentRoot;
                                 }
-                                countRepetitions[wordsRoots[word]].count += 1;
+                                countRepetitions[currentRoot].count += 1;
                             }
                             next();
                         }
@@ -195,9 +186,16 @@ function getTop(count, countRepetitions) {
     }
     sortedCount.sort(compare);
     count = count > sortedCount.length ? sortedCount.length : count;
+    //var writer = fs.
+    //    createWriteStream('Stat.txt')
+    //    .on('finish', function() {
+    //        console.log('Success');
+    //    });
     for (var i = 0; i < count; i++) {
         process.stdout.write(sortedCount[i].word + ' ' + sortedCount[i].count + '\n');
+        //writer.write(sortedCount[i].word + ' ' + sortedCount[i].count + '\n');
     }
+    //writer.end();
 }
 
 /**
