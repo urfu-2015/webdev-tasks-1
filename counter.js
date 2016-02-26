@@ -10,21 +10,6 @@ var WordFrequency = function (text) {
             return Object.keys(this).length;
         }
     });
-    Object.defineProperty(this, 'parse', {
-        value: function (text) {
-            var words = [];
-            var pattern = /(?:[A-zА-яё]+)|(?:\<.*\>)|(?:\\[A-z])|(?:\:[A-z]+\:)/g;
-            var validWordPatt = /(?:^[А-Яа-яё]{2,}$)/;
-            var allWords = text.match(pattern);
-            allWords.forEach(word => {
-                var word = word.toLowerCase();
-                if (validWordPatt.test(word) && badWords.indexOf(word) === -1) {
-                    words.push(word);
-                }
-            });
-            return words;
-        }
-    });
     Object.defineProperty(this, 'join', {
         value: function (wordFreq) {
             var newWordFreq = new WordFrequency();
