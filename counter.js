@@ -4,92 +4,138 @@ var taskList = [];
 const https = require('https');
 const badWords = require('./badWords.js');
 
-var dictionary = {
-    data: {},
-    isEmpty: function () {
-        return Object.keys(this.data).length === 0;
-    },
-    parse: function (text) {
+var WordFrequency = function (text) {
+    Object.defineProperty(this, 'size', {
+        value: function () {
+            return Object.keys(this).length;
+        }
+    });
+    Object.defineProperty(this, 'parse', {
+        value: function (text) {
+            var words = [];
+            var pattern = /(?:[A-zА-яё]+)|(?:\<.*\>)|(?:\\[A-z])|(?:\:[A-z]+\:)/g;
+            var validWordPatt = /(?:^[А-Яа-яё]{2,}$)/;
+            var allWords = text.match(pattern);
+            allWords.forEach(word => {
+                var word = word.toLowerCase();
+                if (validWordPatt.test(word) && badWords.indexOf(word) === -1) {
+                    words.push(word);
+                }
+            });
+            return words;
+        }
+    });
+    Object.defineProperty(this, 'join', {
+        value: function (wordFreq) {
+            var newWordFreq = new WordFrequency();
+            newWordFreq = Object.assign(newWordFreq, this);
+            for (var word in wordFreq) {
+                var isSameRootFound = false;
+                for (var _word in newWordFreq) {
+                    if (this.isSameRootWord(word, _word)) {
+                        newWordFreq[_word] += wordFreq[word];
+                        isSameRootFound = true;
+                        break;
+                    }
+                }
+                if (!isSameRootFound) {
+                    newWordFreq[word] = 1;
+                }
+            }
+            return newWordFreq;
+        }
+    });
+    Object.defineProperty(this, 'top', {
+        value: function (number) {
+            var mostUsedWords = [];
+            for (var _word in this) {
+                for (var i = 0; i < number; i++) {
+                    var word = mostUsedWords[i];
+                    if (this[word] > this[_word]) {
+                        mostUsedWords.splice(i, 0, _word);
+                        break;
+                    }
+                    if (i === mostUsedWords.length - 1) {
+                        mostUsedWords.push(_word);
+                        break;
+                    }
+                    if (word === undefined) {
+                        mostUsedWords[i] = _word;
+                        break;
+                    }
+                }
+                if (mostUsedWords.length > number) {
+                    mostUsedWords = mostUsedWords.slice(
+                        mostUsedWords.length - number, mostUsedWords.length
+                    );
+                }
+            }
+            mostUsedWords.forEach(word => {
+                console.log(word + '  ' + this[word]);
+            });
+        }
+    });
+    Object.defineProperty(this, 'count', {
+        value: function (word) {
+            for (var _word in this) {
+                if (this.isSameRootWord(word, _word)) {
+                    console.log(this[_word]);
+                    return;
+                }
+            }
+            console.log('Нет совпадений!');
+        }
+    });
+    Object.defineProperty(this, 'isSameRootWord', {
+        value: function (firstWord, secondWord) {
+            var rootWordLength = 3;
+            var i = 0;
+            var j = rootWordLength;
+            while (
+                j <= firstWord.length &&
+                i < firstWord.length / 2
+            ) {
+                j = i + rootWordLength;
+                var rootWord = firstWord.slice(i, j);
+                while (
+                    secondWord.indexOf(rootWord) !== -1 &&
+                    secondWord.indexOf(rootWord) < secondWord.length / 2 &&
+                    j <= firstWord.length
+                ) {
+                    if (
+                        rootWord.length >= firstWord.length / 2 ||
+                        rootWord.length >= secondWord.length / 2
+                    ) {
+                        return true;
+                    }
+                    j++;
+                    rootWord = firstWord.slice(i, j);
+                }
+                i++;
+            }
+            return false;
+        }
+    });
+    if (text) {
         var pattern = /(?:[A-zА-яё]+)|(?:\<.*\>)|(?:\\[A-z])|(?:\:[A-z]+\:)/g;
         var validWordPatt = /(?:^[А-Яа-яё]{2,}$)/;
         var allWords = text.match(pattern);
         allWords.forEach(word => {
             var word = word.toLowerCase();
             if (validWordPatt.test(word) && badWords.indexOf(word) === -1) {
-                for (var dictWord in this.data) {
-                    if (this.isSameRootWord(dictWord, word)) {
-                        this.data[dictWord]++;
+                for (var _word in this) {
+                    if (this.isSameRootWord(_word, word)) {
+                        this[_word]++;
                         return;
-                    };
+                    }
                 }
-                this.data[word] = 1;
+                this[word] = 1;
             }
         });
-    },
-    top: function (number) {
-        var mostUsedWords = [];
-        for (var dictWord in this.data) {
-            for (var i = 0; i < number; i++) {
-                var word = mostUsedWords[i];
-                if (this.data[word] > this.data[dictWord]) {
-                    mostUsedWords.splice(i, 0, dictWord);
-                    break;
-                }
-                if (i === mostUsedWords.length - 1) {
-                    mostUsedWords.push(dictWord);
-                    break;
-                }
-                if (word === undefined) {
-                    mostUsedWords[i] = dictWord;
-                    break;
-                }
-            }
-            while (mostUsedWords.length > number) {
-                mostUsedWords.shift();
-            }
-        }
-        mostUsedWords.forEach(word => {
-            console.log(word + '  ' + this.data[word]);
-        });
-    },
-    count: function (word) {
-        for (var dictWord in this.data) {
-            if (this.isSameRootWord(word, dictWord)) {
-                console.log(this.data[dictWord]);
-                return;
-            }
-        }
-        console.log('Нет совпадений!');
-    },
-    isSameRootWord: function (firstWord, secondWord) {
-        var rootWordLength = 3;
-        var i = 0;
-        var j = rootWordLength;
-        while (
-            j <= firstWord.length &&
-            i < firstWord.length / 2
-        ) {
-            j = i + rootWordLength;
-            var rootWord = firstWord.slice(i, j);
-            while (
-                secondWord.indexOf(rootWord) !== -1 &&
-                secondWord.indexOf(rootWord) < secondWord.length / 2 &&
-                j <= firstWord.length
-            ) {
-                if (
-                    rootWord.length >= firstWord.length / 2 ||
-                    rootWord.length >= secondWord.length / 2
-                ) {
-                    return true;
-                }
-                j++;
-                rootWord = firstWord.slice(i, j);
-            }
-            i++;
-        }
-        return false;
     }
 };
+
+var overallWordFreq = new WordFrequency();
 
 var sendHttpReq = function (path, callback) {
     var json;
@@ -100,7 +146,7 @@ var sendHttpReq = function (path, callback) {
         method: 'GET',
         headers: {
             'User-Agent': 'My-Test-App',
-            //Authorization: ,
+            //Authorization:,
             Accept: 'application/vnd.github.v3+json'
         }
     };
@@ -142,7 +188,8 @@ var getTasks = function (response) {
             var path = '/repos/urfu-2015/' + entry.name + '/contents/README.md?ref=master';
             sendHttpReq(path, function (response) {
                 var taskText = (new Buffer(response.content, 'base64')).toString('utf-8');
-                dictionary.parse(taskText);
+                var taskWordFreq = new WordFrequency(taskText);
+                overallWordFreq = overallWordFreq.join(taskWordFreq);
                 tasksParsedCounter++;
                 if (taskCounter === tasksParsedCounter) {
                     taskList.forEach(func => {
@@ -159,7 +206,7 @@ getRepos();
 module.exports.count = function (word) {
     taskList.push(
         function () {
-            dictionary.count(word);
+            overallWordFreq.count(word);
         }
     );
 };
@@ -167,7 +214,7 @@ module.exports.count = function (word) {
 module.exports.top = function (number) {
     taskList.push(
         function () {
-            dictionary.top(number);
+            overallWordFreq.top(number);
         }
     );
 };
