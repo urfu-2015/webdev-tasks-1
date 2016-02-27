@@ -1,6 +1,6 @@
 const counter = require('./counter.js');
 
-counter.top(function (stats) {
+counter.top(10, function (stats) {
     console.log(stats);
 });
 

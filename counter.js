@@ -6,82 +6,138 @@ const Promise = require('promise');
 const natural = require('natural');
 const reduce = require('stream-reduce');
 
-var commonWords = require('./commonWords.js');
+var stopWords = require('./lib/stopWords');
+
+try {
+    var token = fs.readFileSync('./lib/key.txt');
+} catch (e) {
+    console.error(e.message);
+}
 
 const MIN_WORD_DISTANCE = 0.90;
-const MAX_TOP_WORDS = 10;
+const tagsRegExp = /<.+>/g;
+const linksRegExp = /\[(.*)\]\(.+\)/g;
+const codeRegExp = /^```.*\n((.*\n)+?)```$/gm;
+const filenamesRegExp = /[a-zA-Z_]+\.(js|html|css)/g;
+const emojiRegExp = /(:.+:)/g;
 
+/**
+ * Создание потока с преобразованием, разделяющего текст по словам
+ *
+ * @returns {Transform} поток, разделяющий текст по словам
+ */
 var createSplitTransform = function () {
-    return new stream.Transform({
-        transform: function (chunk, enc, cb) {
-            var words = chunk.toString().split(/\s+|-|\//);
-            words.forEach(function (word) {
-                this.push(word);
-            }, this);
-            cb();
-        }
-    });
+    var transform = new stream.Transform();
+    transform._transform = function (chunk, enc, cb) {
+        var words = chunk.toString().split(/\s+|-|\//);
+        words.forEach(function (word) {
+            this.push(word);
+        }, this);
+        cb();
+    };
+    return transform;
 };
 
+/**
+ * Создание потока с преобразованием, удаляющего Markdown
+ *
+ * @returns {Transform} поток, удаляющий Markdown
+ */
 var createRemoveMarkdownTransform = function () {
-    return new stream.Transform({
-        transform: function (chunk, enc, cb) {
-            var text = chunk.toString()
-                .replace(/<.+>/g, '') // теги
-                .replace(/\[(.*)\]\(.+\)/g, '$1') // ссылки
-                .replace(/^```.*\n((.*\n)+?)```$/gm, '') // код
-                .replace(/[a-zA-Z_]+\.(js|html|css)/g, '') // имена файлов
-                .replace(/(:.+:)/g, '');
-            this.push(text);
-            cb();
-        }
-    });
+    var transform = new stream.Transform();
+    transform._transform = function (chunk, enc, cb) {
+        var text = chunk.toString()
+            .replace(tagsRegExp, '')
+            .replace(linksRegExp, '$1')
+            .replace(codeRegExp, '')
+            .replace(filenamesRegExp, '')
+            .replace(emojiRegExp, '');
+        this.push(text);
+        cb();
+    };
+    return transform;
 };
 
+/**
+ * Создание потока с преобразованием, удаляющего знаки препинания и цифры
+ *
+ * @returns {Transform} поток, удаляющий знаки препинания и цифры
+ */
 var createRemovePunctuationMarksTransform = function () {
-    return new stream.Transform({
-        transform: function (chunk, enc, cb) {
-            var text = chunk.toString().replace(/[\d«»–\[\].,№\/#\+!$%\^@&\*;"':{}|=\-_`~()]/g, '');
-            this.push(text);
-            cb();
-        }
-    });
+    var transform = new stream.Transform();
+    transform._transform = function (chunk, enc, cb) {
+        var text = chunk.toString().replace(/[^a-zа-яё]/g, '');
+        this.push(text);
+        cb();
+    };
+    return transform;
 };
 
+/**
+ * Создание потока с преобразованием, приводящего текст к нижнему регистру
+ *
+ * @returns {Transform} поток, приводящий текст к нижнему регистру
+ */
 var createToLowerCaseTransform = function () {
-    return new stream.Transform({
-        transform: function (chunk, enc, cb) {
-            var text = chunk.toString().toLowerCase();
-            this.push(text);
-            cb();
-        }
-    });
+    var transform = new stream.Transform();
+    transform._transform = function (chunk, enc, cb) {
+        var text = chunk.toString().toLowerCase();
+        this.push(text);
+        cb();
+    };
+    return transform;
 };
 
-var createRemoveCommonWordsTransform = function () {
-    return new stream.Transform({
-        transform: function (chunk, enc, cb) {
-            var word = chunk.toString();
-            if (commonWords.indexOf(word) < 0) {
-                this.push(word);
-            }
-            cb();
+/**
+ * Создание потока с преобразованием, удаляющего предлоги и союзы
+ *
+ * @returns {Transform} поток, удаляющий предлоги и союзы
+ */
+var createRemoveStopWordsTransform = function () {
+    var transform = new stream.Transform();
+    transform._transform = function (chunk, enc, cb) {
+        var word = chunk.toString();
+        if (stopWords.indexOf(word) < 0) {
+            this.push(word);
         }
-    });
+        cb();
+    };
+    return transform;
 };
 
+/**
+ * Создание потока с преобразованием, выделяющего корень слова
+ *
+ * @returns {Transform} поток, выделяющий корень слова
+ */
 var createStemmerTransform = function () {
-    return new stream.Transform({
-        transform: function (chunk, enc, cb) {
-            this.push(natural.PorterStemmerRu.stem(chunk.toString()));
-            cb();
-        }
-    });
+    var transform = new stream.Transform();
+    transform._transform = function (chunk, enc, cb) {
+        this.push(natural.PorterStemmerRu.stem(chunk.toString()));
+        cb();
+    };
+    return transform;
 };
 
+/**
+ * Добавляет к transform потоки для очистки текста
+ *
+ * @param transform поток с преобразованием
+ */
+var addCleanTransforms = function (transform) {
+    return transform.pipe(createSplitTransform())
+        .pipe(createToLowerCaseTransform())
+        .pipe(createRemovePunctuationMarksTransform())
+        .pipe(createRemoveStopWordsTransform());
+};
 
-var token = fs.readFileSync('key.txt');
-
+/**
+ * Асинхронная загрузка файла по указанному url в stream
+ *
+ * @param url адрес файла
+ * @param stream поток, в который будет записан файл
+ * @returns {Promise} Promise, который будет выполнен, когда будет загружен файл
+ */
 var fetchFile = function (url, stream) {
     return new Promise(function (resolve, reject) {
         var options = {
@@ -99,7 +155,7 @@ var fetchFile = function (url, stream) {
                     stream.write(new Buffer(readme.content, 'base64').toString('utf-8'));
                     resolve();
                 } else {
-                    console.log(res.statusCode);
+                    console.error([res.statusCode, options.url, res.statusMessage].join(' '));
                     reject();
                 }
             }
@@ -107,6 +163,11 @@ var fetchFile = function (url, stream) {
     });
 };
 
+/**
+ * Асинхронная загрузка всех файлов и завершение потока, когда все файлы загружены
+ *
+ * @param stream поток, в который будет записан файл
+ */
 var fetchFiles = function (stream) {
     var promises = [];
     for (var i = 1; i <= 10; i++) {
@@ -118,13 +179,16 @@ var fetchFiles = function (stream) {
     });
 };
 
+/**
+ * Возвращает число повторений данного слова
+ *
+ * @param word слово, число повторений которого нужно найти
+ * @param callback функция, которая будет вызвана с результатом вычислений
+ */
 var count = function (word, callback) {
     var stem = natural.PorterStemmerRu.stem(word);
     var transform = createRemoveMarkdownTransform();
-    transform.pipe(createSplitTransform())
-        .pipe(createRemovePunctuationMarksTransform())
-        .pipe(createToLowerCaseTransform())
-        .pipe(createRemoveCommonWordsTransform())
+    addCleanTransforms(transform)
         .pipe(createStemmerTransform())
         .pipe(reduce(function (acc, chunk) {
             var textWord = chunk.toString();
@@ -139,12 +203,15 @@ var count = function (word, callback) {
     fetchFiles(transform);
 };
 
-var top = function (callback) {
+/**
+ * Возвращает топ n слов
+ *
+ * @param n количество слов в топе
+ * @param callback функция, которая будет вызвана с результатом вычислений
+ */
+var top = function (n, callback) {
     var transform = createRemoveMarkdownTransform();
-    transform.pipe(createSplitTransform())
-        .pipe(createRemovePunctuationMarksTransform())
-        .pipe(createToLowerCaseTransform())
-        .pipe(createRemoveCommonWordsTransform())
+    addCleanTransforms(transform)
         .pipe(reduce(function (acc, chunk) {
             var word = chunk.toString();
             var stem = natural.PorterStemmerRu.stem(word);
@@ -168,7 +235,7 @@ var top = function (callback) {
                 return [data[stem].sort()[0], data[stem].length];
             }).sort(function (stemData1, stemData2) {
                 return stemData2[1] - stemData1[1];
-            }).slice(0, MAX_TOP_WORDS);
+            }).slice(0, n);
 
             callback(sortedStems);
         }));
@@ -176,5 +243,4 @@ var top = function (callback) {
     fetchFiles(transform);
 };
 
-module.exports.count = count;
-module.exports.top = top;
+module.exports = {count: count, top: top};
