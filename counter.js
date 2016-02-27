@@ -118,11 +118,7 @@ module.exports.top = function (n) {
         return hiddenTop(n);
     }
     deferredAction.push(function (i) {
-        return function (error) {
-            if (error) {
-                console.log('ERROR');
-            }
-            DATA_ANALYZED = true;
+        return function () {
             hiddenTop(i);
         };
     }(n));
@@ -133,11 +129,7 @@ module.exports.count = function (word) {
         return hiddenCount(word);
     }
     deferredAction.push(function (i) {
-        return function (error) {
-            if (error) {
-                console.log('ERROR');
-            }
-            DATA_ANALYZED = true;
+        return function () {
             hiddenCount(i);
         };
     }(word));
