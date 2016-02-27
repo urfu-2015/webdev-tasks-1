@@ -1,10 +1,8 @@
 const counter = require('./index.js');
-counter.count('задания', function (result) {
-    console.log('count');
+counter.count('задания').then(function (result) {
     console.log(result);
 });
 
-counter.top(10, function (result) {
-    console.log('top');
+counter.top(10).then(function (result) {
     console.log(result);
 });

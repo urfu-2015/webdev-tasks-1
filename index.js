@@ -48,7 +48,7 @@ function getStat(text) {
 }
 
 var main = function (callback) {
-    co(
+    return co(
         function *() {
             var data = yield r(getRequestDataGitAPI('orgs/urfu-2015/repos'));
             var dataJSON = JSON.parse(data.body);
@@ -72,9 +72,9 @@ var main = function (callback) {
 module.exports.count = function (word, callback) {
     var root = natural.PorterStemmerRu.stem(word);
     var count = function (words) {
-        callback(words[root]);
+        return words[root];
     };
-    main(count);
+    return main(count);
 };
 
 module.exports.top = function (count, callback) {
@@ -89,7 +89,7 @@ module.exports.top = function (count, callback) {
             result.push(words[keys[i]]);
         }
 
-        callback(result);
+        return result;
     };
-    main(top);
+    return main(top);
 };
