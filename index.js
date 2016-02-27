@@ -4,7 +4,7 @@ var counter = require('./counter.js');
 
 counter.top(10, function (err, results) {
     if (err) {
-        callback(err);
+        console.error(err);
     } else {
         results.forEach(result => console.log(result));
     }
@@ -12,7 +12,7 @@ counter.top(10, function (err, results) {
 
 counter.count('код', function (err, result) {
     if (err) {
-        console.log(err);
+        console.error(err);
     } else {
         console.log(result);
     }

@@ -30,7 +30,7 @@ function getWordsFromAllReadMe(callback) {
                 getReadMe(url, words, next);
             });
         } else {
-            callback(err ? err : 'Status code: ' + response.statusCode);
+            callback(err || 'Status code: ' + response.statusCode);
         }
     });
 }
@@ -45,7 +45,7 @@ function getDictOptions(curURL) {
 };
 
 function getURLOfRep(name) {
-    return 'https://api.github.com/repos/urfu-2015/' + name + '/readme?access_token=' + token;
+    return `https://api.github.com/repos/urfu-2015/${name}/readme?access_token=${token}`;
 }
 
 function getReadMe(url, words, callback) {
@@ -55,7 +55,7 @@ function getReadMe(url, words, callback) {
             words = getFilteredWords(content, words);
             callback(null, words);
         } else {
-            callback(err ? err : 'Status code: ' + response.statusCode);
+            callback(err || 'Status code: ' + response.statusCode);
         }
     });
 }
