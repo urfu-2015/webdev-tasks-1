@@ -6,16 +6,16 @@ const fs = require('fs');
 const nowords = require('./nowords');
 const token = fs.readFileSync('./key.txt', 'utf-8');
 
-function getRequest(callback) {
+function getWordsFromAllReadMe(callback) {
     var repURL = 'https://api.github.com/orgs/urfu-2015/repos?access_token=' + token;
     request(getDictOptions(repURL), function (err, response, body) {
         if (!err && response.statusCode == 200) {
-            var items = JSON.parse(body);
+            var repos = JSON.parse(body);
             var urls = [];
-            items.forEach(function (repos) {
-                var name = repos.name;
+            repos.forEach(function (rep) {
+                var name = rep.name;
                 if (name.indexOf('verstka-tasks') != -1 || name.indexOf('javascript-tasks') != -1) {
-                    urls.push(getURLNamedRep(name));
+                    urls.push(getURLOfRep(name));
                 }
             });
             var count = 0;
@@ -29,6 +29,8 @@ function getRequest(callback) {
             urls.forEach(function (url) {
                 getReadMe(url, words, next);
             });
+        } else {
+            callback(err ? err : 'Status code: ' + response.statusCode);
         }
     });
 }
@@ -42,21 +44,23 @@ function getDictOptions(curURL) {
     };
 };
 
-function getURLNamedRep(name) {
+function getURLOfRep(name) {
     return 'https://api.github.com/repos/urfu-2015/' + name + '/readme?access_token=' + token;
 }
 
 function getReadMe(url, words, callback) {
     request(getDictOptions(url), function (err, response, body) {
         if (!err && response.statusCode == 200) {
-            var buff = new Buffer(JSON.parse(body).content, 'base64').toString('utf-8');
-            words = getWords(buff, words);
+            var content = new Buffer(JSON.parse(body).content, 'base64').toString('utf-8');
+            words = getFilteredWords(content, words);
             callback(null, words);
+        } else {
+            callback(err ? err : 'Status code: ' + response.statusCode);
         }
     });
 }
 
-function getWords(text, words) {
+function getFilteredWords(text, words) {
     var allWords = getListOfWords(text);
     return getWordsWithoutNowords(allWords, words);
 }
@@ -77,27 +81,22 @@ function getWordsWithoutNowords(allWords, words) {
 
 function getStats(allWords) {
     var stemDict = [];
-    for (var i = 0; i < allWords.length; i++) {
-        var word = allWords[i];
+    allWords.forEach(function (word) {
         if ('абвгдеёжзийклмнопрстуфхцчшщьыъэюя'.indexOf(word.charAt(0)) == -1) {
-            continue;
+            return;
         }
         var stem = natural.PorterStemmerRu.stem(word);
-        var isNewWord = true;
-        for (var j = 0; j < stemDict.length; j++) {
-            if (stemDict[j].stem == stem) {
-                stemDict[j].count++;
-                isNewWord = false;
-            }
-        }
-        if (isNewWord) {
+        var index = stemDict.findIndex(currentStem => currentStem.stem == stem);
+        if (index == -1) {
             stemDict.push({
                 word: word,
                 stem: stem,
                 count: 1
             });
+        } else {
+            stemDict[index].count++;
         }
-    }
+    });
     return stemDict.sort(compareStems);
 }
 
@@ -105,38 +104,31 @@ function compareStems(word1, word2) {
     return word2.count - word1.count;
 }
 
-module.exports.top = function (n) {
-    var results = [];
-    getRequest(function (err, allWords) {
+module.exports.top = function (n, callback) {
+    var allResults = [];
+    getWordsFromAllReadMe(function (err, allWords) {
         if (err) {
-            console.log('Error!');
+            callback(err);
         } else {
-            results = getStats(allWords);
+            allResults = getStats(allWords);
+            var resultsN = [];
             for (var i = 0; i < n; i++) {
-                console.log(results[i].word + ' ' + results[i].count);
+                resultsN.push(allResults[i].word + ' ' + allResults[i].count);
             }
+            callback(null, resultsN);
         }
     });
 };
 
-module.exports.count = function (word) {
+module.exports.count = function (word, callback) {
     var results = [];
-    getRequest(function (err, allWords) {
+    getWordsFromAllReadMe(function (err, allWords) {
         if (err) {
-            console.log('Error!');
+            callback(err);
         } else {
             results = getStats(allWords);
-            var isWord = false;
-            for (var i = 0; i < results.length; i++) {
-                isWord = natural.PorterStemmerRu.stem(word) == results[i].stem;
-                if (isWord) {
-                    console.log(results[i].count);
-                    break;
-                }
-            }
-            if (!isWord) {
-                console.log(0);
-            }
+            var resultWord = results.find(cur => natural.PorterStemmerRu.stem(word) == cur.stem);
+            callback(null, resultWord ? resultWord.count : 0);
         }
     });
 };
