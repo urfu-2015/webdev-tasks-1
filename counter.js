@@ -44,7 +44,7 @@ function GitRequest(options, callback) {
 }
 
 function getREADMEFromReps(repNames, callback) {
-    var olol = [];
+    var words = [];
     var index = 0;
     for (var i = 0; i < repNames.length; i++) {
         var url = 'https://api.github.com/repos/urfu-2015' + '/' + repNames[i] + '/readme';
@@ -52,10 +52,10 @@ function getREADMEFromReps(repNames, callback) {
             if (!error && response.statusCode == 200) {
                 index += 1;
                 var encodedREADME = JSON.parse(body).content;
-                var words = parseText(encodedREADME);
-                olol = olol.concat(words);
+                var newWords = parseText(encodedREADME);
+                words = words.concat(newWords);
                 if (index === repNames.length) {
-                    var dict = createDictionary(olol);
+                    var dict = createDictionary(words);
                     callback(dict);
                 }
             }
@@ -99,8 +99,9 @@ function createDictionary(words) {
 }
 
 function parseText(encodedText) {
-    var text = new Buffer(encodedText, 'base64').toString().toLowerCase();
-    return words = text
+    var text = new Buffer(encodedText, 'base64').toString();
+    return text
+        .toLowerCase()
         .replace(/[^А-Яа-яЁё]/g, ' ')
         .replace(/\s+/, ' ')
         .split(' ')
@@ -113,7 +114,7 @@ function filterFunction(word) {
 
 function printTopWords(dict, n) {
     var top = Object.keys(dict).sort(function (a, b) {
-        return getCountOfWordsWithRoot(dict, b) - getCountOfWordsWithRoot(dict, a);
+        return getCountOfWordsWithRoot(dict, a) > getCountOfWordsWithRoot(dict, b);
     });
     for (var i = 0; i < n; i++) {
         console.log(Object.keys(dict[top[i]]).pop() + ' ' +
