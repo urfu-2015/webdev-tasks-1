@@ -8,19 +8,7 @@ var DATA_ANALYZED = false;
 var deferredAction = [];
 var stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
 
-init(function (error) {
-    if (error) {
-        return console.log('ERROR');
-    }
-    DATA_ANALYZED = true;
-    while (deferredAction.length != 0) {
-        var action = deferredAction.shift();
-        action();
-    }
-});
-
-
-function init(callback) {
+var promise = new Promise(function (resolve, reject) {
     console.log('data is processed...');
     var mainRequest = {
         url: 'https://api.github.com/orgs/urfu-2015/repos?access_token=' + OAUTH_TOKEN,
@@ -29,32 +17,41 @@ function init(callback) {
         }
     };
     request(mainRequest, function (error, response, body) {
-        if (!error && response.statusCode === 200) {
-            var repos = JSON.parse(body);
-            var names = [];
-            for (var i = 0; i < repos.length; i++) {
-                if (repos[i].name.indexOf('verstka-tasks') !== -1 ||
-                    repos[i].name.indexOf('javascript-tasks') !== -1) {
-                    names.push(repos[i].name);
+        if (error || response.statusCode !== 200) {
+            reject('ERROR');
+        }
+        var repos = JSON.parse(body);
+        var names = [];
+        for (var i = 0; i < repos.length; i++) {
+            if (repos[i].name.indexOf('verstka-tasks') !== -1 ||
+                repos[i].name.indexOf('javascript-tasks') !== -1) {
+                names.push(repos[i].name);
+            }
+        }
+        var calls = 0;
+        for (var i = 0; i < names.length; i++) {
+            processingREADME(names[i], function (error) {
+                if (error) {
+                    reject(error);
                 }
-            }
-            var calls = 0;
-            for (var i = 0; i < names.length; i++) {
-                processingREADME(names[i], function (error) {
-                    if (error) {
-                        return callback(error);
-                    }
-                    calls++;
-                    if (calls === names.length) {
-                        return callback(null);
-                    }
-                });
-            }
-        } else {
-            callback('ERROR');
+                if (++calls === names.length) {
+                    resolve();
+                }
+            });
         }
     });
-}
+});
+
+promise.then(
+    result => {
+        while (deferredAction.length != 0) {
+            var action = deferredAction.shift();
+            action();
+        }
+        DATA_ANALYZED = true;
+    },
+    error => console.log(error)
+);
 
 function processingREADME(name, callback) {
     var getRequest = {
@@ -95,7 +92,7 @@ function addToFrequencyArray(wordArray) {
     for (var i = 0; i < wordArray.length; i++) {
         var added = false;
         var fullWord = wordArray[i];
-        var stemWord = natural.PorterStemmerRu.stem(wordArray[i]);
+        var stemWord = natural.PorterStemmerRu.stem(fullWord);
         for (var j = 0; j < FREQUENCY_DICT.length; j++) {
             if (natural.JaroWinklerDistance(fullWord, FREQUENCY_DICT[j].key) > 0.85) {
                 FREQUENCY_DICT[j].count += 1;
