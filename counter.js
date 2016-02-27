@@ -5,15 +5,24 @@ var async = require('async');
 var forEach = require('async-foreach').forEach;
 var request = require('request');
 
-function printCountCallback(word, objectResult, resultCallback) {
-    var resultValue;
-    for (var i = 0;i < objectResult.length;i++) {
-        if (objectResult[i][0] != '') {
-            var mayInRoot = objectResult[i][1];
-            for (var j = 0; j < mayInRoot.length; j++) {
-                if (word == mayInRoot[j]) {
-                    resultValue = mayInRoot.length;
-                    resultCallback(resultValue);
+var GITHUB_API_URL = 'https://api.github.com';
+var VNUTRISLOVA_URL = 'http://vnutrislova.net/';
+var PLUS_INF = 999999;
+var SHIFT_FROM_ROOT = 8;
+var PARSER_STOP_SYMBOL = ']';
+var DATA_FILE = 'counter-data.json';
+
+function getCount(word, arrayResult, resultCallback) {
+    /*
+        Корень '' нужно пропустить,
+        т.к в нем хранятся неопределенные слова
+    */
+    for (var i = 0;i < arrayResult.length; i++) {
+        if (arrayResult[i][0] != '') {
+            var wordsCurrentRoot = arrayResult[i][1];
+            for (var j = 0; j < wordsCurrentRoot.length; j++) {
+                if (word === wordsCurrentRoot[j]) {
+                    resultCallback(wordsCurrentRoot.length);
                     break;
                 }
             }
@@ -21,32 +30,39 @@ function printCountCallback(word, objectResult, resultCallback) {
     }
 }
 
-function printTopCallback(count, objectResult, resultCallback) {
+function getTop(count, arrayResult, resultCallback) {
+    /*
+        Алгоритм:
+        1) ищем корень с самым большим количеством слов
+        2) добавляем его и самое короткое слово с этим корнем в ответ
+        3) убираем корень и слова с этим корнем из arrayResult
+        4) повторяем count раз
+     */
     var results = [];
     while (count != 0) {
         var topLength = -1;
         var nowRoot = '';
-        for (var i = 0;i < objectResult.length;i++) {
-            if (objectResult[i][0] != '' && objectResult[i][0].length > 2) {
-                var mayInRoot = objectResult[i][1];
-                if (mayInRoot.length > topLength) {
-                    topLength = mayInRoot.length;
-                    nowRoot = objectResult[i][0];
+        for (var i = 0;i < arrayResult.length; i++) {
+            if (arrayResult[i][0] != '' && arrayResult[i][0].length > 2) {
+                var wordsCurrentRoot = arrayResult[i][1];
+                if (wordsCurrentRoot.length > topLength) {
+                    topLength = wordsCurrentRoot.length;
+                    nowRoot = arrayResult[i][0];
                 }
             }
         }
         count -= 1;
         var tempWords = [];
-        for (var i = 0;i < objectResult.length;i++) {
-            if (objectResult[i][0] == nowRoot) {
-                tempWords = objectResult[i][1];
-                objectResult[i][1] = [];
+        for (var i = 0;i < arrayResult.length; i++) {
+            if (arrayResult[i][0] === nowRoot) {
+                tempWords = arrayResult[i][1];
+                arrayResult[i][1] = [];
                 break;
             }
         }
-        var minLength = 999;
+        var minLength = PLUS_INF;
         var resultWord = '';
-        for (var j = 0;j < tempWords.length;j++) {
+        for (var j = 0;j < tempWords.length; j++) {
             if (tempWords[j].length < minLength) {
                 resultWord = tempWords[j];
                 minLength = tempWords[j].length;
@@ -58,30 +74,33 @@ function printTopCallback(count, objectResult, resultCallback) {
 }
 
 var getStats = function (word, type, resultCallback) {
-    var glResult;
+    /*
+        Функция формирует струтуру данных со словами и корнями и в
+        зависимости от type затем вызывает getTop или getCount для парсинга
+        этой структуры.
+    */
     async.waterfall([
         function getRepos(callback) {
-            var allowedRepos = [];
             request({
-                url: 'https://api.github.com/orgs/urfu-2015/repos?access_token=' + oauth_token,
+                url: GITHUB_API_URL + '/orgs/urfu-2015/repos?access_token=' + oauth_token,
                 method: 'GET',
                 headers: {'user-agent': 'mdf-app'}
             }, function (error, response, body) {
-                var reposArgs = [];
+                var allowedRepos = [];
                 var bodyJSON = JSON.parse(body);
                 for (var repoId = 0; repoId < bodyJSON.length; repoId++) {
                     if (bodyJSON[repoId].name.indexOf('tasks') != -1) {
-                        reposArgs.push(repoId);
+                        allowedRepos.push(repoId);
                     }
                 }
-                callback(null, reposArgs, bodyJSON);
+                callback(null, allowedRepos, bodyJSON);
             });
         },
-        function getReadme(reposArgs, bodyJSON, callback) {
+        function getReadme(allowedRepos, bodyJSON, callback) {
             var result = [];
-            async.eachSeries(reposArgs, function (key, next) {
+            async.eachSeries(allowedRepos, function (key, next) {
                 request({
-                    url: 'https://api.github.com/repos/' + bodyJSON[key].full_name +
+                    url: GITHUB_API_URL + '/repos/' + bodyJSON[key].full_name +
                         '/readme?access_token=' + oauth_token,
                     method: 'GET',
                     headers: {'user-agent': 'mdf-app'}
@@ -106,7 +125,7 @@ var getStats = function (word, type, resultCallback) {
                         .replace(/\s+/g, ' ')
                         .toLowerCase()
                         .split(' ');
-                    for (var i = 0;i < currentWords.length;i++) {
+                    for (var i = 0;i < currentWords.length; i++) {
                         words.push(currentWords[i]);
                     }
                     next();
@@ -116,22 +135,29 @@ var getStats = function (word, type, resultCallback) {
             });
         },
         function getRoots(words, callback) {
+            /*
+                Алгоритм получения корня:
+                1) находим на странице слово 'корень'
+                2) т.к. формат ответа : ... корень [кот] ...
+                   пропускаем от буквы 'к' 8 символов и
+                   начинаем считывать корень до ']'
+             */
             var rootObject = [];
             async.eachSeries(words, function (key, next) {
-                encodeWord = encodeURI('разбор/по-составу/' + key);
+                var encodeWord = encodeURI('разбор/по-составу/' + key);
                 request({
-                    url: 'http://vnutrislova.net/' + encodeWord,
+                    url: VNUTRISLOVA_URL + encodeWord,
                     method: 'GET'
                 }, function (error, response, body) {
                     var result = '';
                     if (body != undefined) {
                         var indexRoot = body.indexOf('корень');
                         if (indexRoot != -1) {
-                            var startIndex = indexRoot + 8;
+                            var startIndex = indexRoot + SHIFT_FROM_ROOT;
                             while (true) {
                                 result += body[startIndex];
                                 startIndex += 1;
-                                if (body[startIndex] == ']') {
+                                if (body[startIndex] === PARSER_STOP_SYMBOL) {
                                     break;
                                 }
                             }
@@ -140,13 +166,13 @@ var getStats = function (word, type, resultCallback) {
                         }
                     }
                     var was = false;
-                    for (var i = 0;i < rootObject.length;i++) {
-                        if (rootObject[i][0] == result) {
+                    for (var i = 0;i < rootObject.length; i++) {
+                        if (rootObject[i][0] === result) {
                             rootObject[i][1].push(key);
                             was = true;
                         }
                     }
-                    if (was == false) {
+                    if (was === false) {
                         rootObject.push([result, [key]]);
                     }
                     next();
@@ -157,20 +183,42 @@ var getStats = function (word, type, resultCallback) {
         }
     ],
         function (err, returnValue) {
-            if (type == 'count') {
-                printCountCallback(word, returnValue, resultCallback);
+            fs.writeFileSync('counter-data.json', JSON.stringify(returnValue));
+            /*
+                В returnValue теперь лежит структура слов с корнями вида:
+                    [
+                        ['кот', ['кот', 'котик', 'кот'],
+                        ['баб', ['бабушка', 'бабуленька'],
+                        ...
+                    ]
+                    В зависимости от требуемого запроса теперь
+                    следующие ниже вызовы функций обрабатывают эту структуру
+             */
+            if (type === 'count') {
+                getCount(word, returnValue, resultCallback);
             }
-            if (type == 'top') {
-                printTopCallback(word, returnValue, resultCallback);
+            if (type === 'top') {
+                getTop(word, returnValue, resultCallback);
             }
         });
 };
 
-
 module.exports.count = function (word, resultCallback) {
-    getStats(word, 'count', resultCallback);
+    if (fs.existsSync(DATA_FILE)) {
+        var loadData = fs.readFileSync(DATA_FILE);
+        loadData = JSON.parse(loadData);
+        getCount(word, loadData, resultCallback);
+    } else {
+        getStats(word, 'count', resultCallback);
+    }
 };
 
 module.exports.top = function (count, resultCallback) {
-    getStats(count, 'top', resultCallback);
+    if (fs.existsSync(DATA_FILE)) {
+        var loadData = fs.readFileSync(DATA_FILE);
+        loadData = JSON.parse(loadData);
+        getTop(count, loadData, resultCallback);
+    } else {
+        getStats(count, 'top', resultCallback);
+    }
 };

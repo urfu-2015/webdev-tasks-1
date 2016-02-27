@@ -1,4 +1,4 @@
 var counter = require('./counter.js');
-counter.count('котик', function (data) {
+counter.top(5, function (data) {
     console.log(data);
 });
