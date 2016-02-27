@@ -42,16 +42,7 @@ var promise = new Promise(function (resolve, reject) {
     });
 });
 
-promise.then(
-    result => {
-        while (deferredAction.length != 0) {
-            var action = deferredAction.shift();
-            action();
-        }
-        DATA_ANALYZED = true;
-    },
-    error => console.log(error)
-);
+
 
 function processingREADME(name, callback) {
     var getRequest = {
@@ -115,41 +106,67 @@ function addToFrequencyArray(wordArray) {
 
 module.exports.top = function (n) {
     if (DATA_ANALYZED) {
-        return hiddenTop(n);
+        return new Promise(function (resolve, reject) {
+            resolve(hiddenTop(n));
+        });
     }
     deferredAction.push(function (i) {
         return function () {
-            hiddenTop(i);
+            return hiddenTop(i);
         };
     }(n));
+    return promise.then(
+    result => {
+        DATA_ANALYZED = true;
+        while (deferredAction.length !== 0) {
+            var action = deferredAction.shift();
+            return action();
+        }
+    },
+    error => console.log(error)
+    );
 };
 
 module.exports.count = function (word) {
     if (DATA_ANALYZED) {
-        return hiddenCount(word);
+        return new Promise(function (resolve, reject) {
+            resolve(hiddenCount(word));
+        });
     }
     deferredAction.push(function (i) {
         return function () {
-            hiddenCount(i);
+            return hiddenCount(i);
         };
     }(word));
+    return promise.then(
+    result => {
+        DATA_ANALYZED = true;
+        while (deferredAction.length !== 0) {
+            var action = deferredAction.shift();
+            return action();
+        }
+    },
+    error => console.log(error)
+    );
 };
 
 function hiddenTop(n) {
     FREQUENCY_DICT.sort(compare);
     FREQUENCY_DICT.reverse();
+    var result = [];
     for (var i = 0; i < Math.min(n, FREQUENCY_DICT.length); i++) {
-        console.log(FREQUENCY_DICT[i].fullWords[0] + ' ' + FREQUENCY_DICT[i].count + '\n');
+        result.push(FREQUENCY_DICT[i].fullWords[0] + ' ' + FREQUENCY_DICT[i].count);
     };
+    return result.join('\n');
 }
 
 function hiddenCount(word) {
     for (var i = 0; i < FREQUENCY_DICT.length; i++) {
         if (natural.JaroWinklerDistance(word, FREQUENCY_DICT[i].key) > 0.85) {
-            return console.log(FREQUENCY_DICT[i].count);
+            return FREQUENCY_DICT[i].count;
         }
     }
-    console.log('word is not found');
+    return 'word is not found';
 }
 
 function compare(a, b) {
