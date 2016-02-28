@@ -9,20 +9,32 @@ var stemmer = snowball.newStemmer('russian');
 var reposURL = 'https://api.github.com/users/urfu-2015/repos';
 
 module.exports.top = function (n) {
-    doRequest(function (err, result) {
-        getTop(result, n);
+    return new Promise(function (resolve, reject) {
+        doRequest(function (err, result) {
+            if (err) {
+                //console.log('ERROR ' + err);
+                reject(err);
+            }
+            var resTop = getTop(result, n);
+            resolve(resTop);
+        });
     });
 };
 
 module.exports.count = function (word) {
     doRequest(function (err, result) {
-        getCount(result, word);
+        if (err) {
+            reject(err);
+        } else {
+            var resCount = getCount(result, n);
+            resolve(resCount);
+        }
     });
 };
 
 function doRequest(callback) {
     request(getOptions(reposURL), function (error, response, body) {
-        if (!error && response.statusCode == 200) {
+        if (!error && response.statusCode === 200) {
             var promises = [];
             body.forEach(function (repo) {
                 if (repo.name.indexOf('tasks') != -1) {
@@ -35,6 +47,8 @@ function doRequest(callback) {
                 var result = getResult(getWords(res));
                 callback(null, result);
             });
+        } else {
+            console.log('ERROR ' + err);
         }
     });
 }
@@ -48,7 +62,7 @@ function getOptions(reqURL) {
         },
         json: true
     };
-};
+}
 
 function getReadMe(url) {
     return new Promise(function (resolve, reject) {
@@ -61,7 +75,7 @@ function getReadMe(url) {
             }
         });
     });
-};
+}
 
 function getWords(tasks) {
     var words = [];
@@ -75,14 +89,14 @@ function getWords(tasks) {
             });
     });
     return words;
-};
+}
 
 function filterWords(word) {
     if (word.length > 0 && wordsToIgnore.indexOf(word.toLowerCase()) < 0) {
         return true;
     }
     return false;
-};
+}
 
 function getResult(words) {
     var result = [];
@@ -98,7 +112,7 @@ function getResult(words) {
         }
     });
     return result.sort(compare);
-};
+}
 
 function compare(a, b) {
     if (a.words.length > b.words.length) {
@@ -108,17 +122,19 @@ function compare(a, b) {
         return 1;
     }
     return 0;
-};
+}
 
 function getTop(result, n) {
+    var str = '';
     if (n >= result.length) {
         n = result.length;
     }
     for (var i = 0; i < n; i++) {
-        var str = result[i].words[0] + ' ' + result[i].words.length;
-        console.log(str);
+        str += result[i].words[0] + ' ' + result[i].words.length;
+        i != n - 1 ? str += '\r\n' : str = str;
     }
-};
+    return str;
+}
 
 function getCount(result, word) {
     var stem = stemmer.stem(word);
@@ -126,8 +142,8 @@ function getCount(result, word) {
         return obj.stem === stem;
     });
     if (element.length > 0 && element[0].words.indexOf(word) != -1) {
-        console.log(element[0].words.length);
+        return element[0].words.length;
     } else {
-        console.log(0);
+        return 0;
     }
-};
+}
