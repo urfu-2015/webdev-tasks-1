@@ -2,7 +2,9 @@
   "private": true,
   "dependencies": {
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "request": "^2.69.0",
+    "snowball-stemmers": "^0.6.0"
   },
   "scripts": {
     "lint": "jscs ."
