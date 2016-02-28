@@ -1,8 +1,13 @@
 {
   "private": true,
   "dependencies": {
+    "bluebird": "^3.3.3",
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "mocha": "^2.3.3",
+    "natural": "^0.2.1",
+    "request": "^2.69.0",
+    "request-promise": "^2.0.1",
+    "sync-request": "^3.0.0"
   },
   "scripts": {
     "lint": "jscs ."
