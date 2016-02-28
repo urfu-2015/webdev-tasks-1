@@ -1,17 +1,12 @@
 'use strict';
-const request = require('request');
+var Promise = require('bluebird');
+var request = require('request');
 var RussianStemmer = require('snowball-stemmer.jsx/dest/russian-stemmer.common.js').RussianStemmer;
+var config = require('./config');
 
-var key = require('fs').readFileSync('key.txt', 'utf-8');
-
-var urls = [];
-var jsPattern = 'https://api.github.com/repos/urfu-2015/javascript-tasks-';
-var htmlPattern = 'https://api.github.com/repos/urfu-2015/verstka-tasks-';
-for (var i = 1; i <= 10; i++) {
-    var str = i + '/readme?access_token=' + key;
-    urls.push(jsPattern + str);
-    urls.push(htmlPattern + str);
-}
+var urls = config.repos.map(function (repo) {
+        return config.repoPath + repo + '/readme?access_token=' + config.token;
+});
 
 var findTop = function (data) {
     var words = [];
@@ -63,49 +58,46 @@ var printCount = function (data, word) {
 
 var generate = function(method, attr) {
     var res = [];
+    var func;
+    if (method === 'top') {
+        func = printTop;
+    }
+    if (method === 'count') {
+        func = printCount;
+    }
 
-    var req = new Promise(function(resolve, reject) {
-        urls.forEach(function (uri, i) {
+    Promise.map(urls, function(url) {
+        return new Promise(function (resolve, reject) {
             var options = {
-                url: uri,
+                url: url,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'
                 }
             };
             request(options, function (error, response, body) {
-                if (!error && response.statusCode === 200) {
-                    //console.log('connected');
-                    const registry = JSON.parse(body);
-                    res.push(new Buffer(registry.content, 'base64').toString('utf-8'));
-                } else {
-                    //console.log('Can not connect');
+                if (error || response.statusCode !== 200) {
                     res.push('');
+                    reject();
+                    return;
                 }
-                if (res.length === urls.length) {
-                    resolve(res);
-                }
-            });
-        });
-    });
-
-    req.then(function success (data) {
-        var result = findTop(data);
-        if (method === 'top') {
-            printTop(result, attr);
-        }
-        if (method === 'count') {
-            printCount(result, attr);
-        }
+                const registry = JSON.parse(body);
+                res.push(new Buffer(registry.content, 'base64').toString('utf-8'));
+                resolve();
+            })
+        })
+    }).then(function() {
+        var result = findTop(res);
+        func(findTop(res), attr);
+    }).catch(function() {
         var count = 0;
-        data.forEach(function (str) {
+        res.forEach(function (str) {
             if (str === '' ) count += 1;
         }, this);
-        count = data.length - count;
-        console.log('На основе ' + count + ' текстов задач');
+        count = urls.length - count;
+        console.log('Результаты на основе ' + count + ' задач:');
+        func(findTop(res), attr);
     });
 };
-
-//generate('count', 'котик');
 
 module.exports.top = function (n) {
     generate('top', n);
