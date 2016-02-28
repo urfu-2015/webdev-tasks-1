@@ -22,14 +22,16 @@ module.exports.top = function (n) {
 };
 
 module.exports.count = function (word) {
-    doRequest(function (err, result) {
-        if (err) {
-            reject(err);
-        } else {
-            var resCount = getCount(result, n);
-            resolve(resCount);
-        }
-    });
+    return new Promise(function (resolve, reject) {
+        doRequest(function (err, result) {
+            if (err) {
+                reject(err);
+            } else {
+                var resCount = getCount(result, word);
+                resolve(resCount);
+            }
+        });
+    });    
 };
 
 function doRequest(callback) {
