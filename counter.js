@@ -11,12 +11,25 @@ var PLUS_INF = 999999;
 var SHIFT_FROM_ROOT = 8;
 var PARSER_STOP_SYMBOL = ']';
 var DATA_FILE = 'counter-data.json';
+var STOP_WORDS_FILE = 'stop.json';
+
+function deleteStopWords(arrayResult) {
+    var stopWordsData = fs.readFileSync(STOP_WORDS_FILE);
+    stopWordsData = JSON.parse(stopWordsData);
+    for (var i = 0;i < arrayResult.length; i++) {
+        if (stopWordsData.indexOf(arrayResult[i][0]) !== -1) {
+            arrayResult[i][1] = [];
+        }
+    }
+    return arrayResult;
+}
 
 function getCount(word, arrayResult, resultCallback) {
     /*
         Корень '' нужно пропустить,
         т.к в нем хранятся неопределенные слова
     */
+    arrayResult = deleteStopWords(arrayResult);
     for (var i = 0;i < arrayResult.length; i++) {
         if (arrayResult[i][0] != '') {
             var wordsCurrentRoot = arrayResult[i][1];
@@ -38,6 +51,7 @@ function getTop(count, arrayResult, resultCallback) {
         3) убираем корень и слова с этим корнем из arrayResult
         4) повторяем count раз
      */
+    arrayResult = deleteStopWords(arrayResult);
     var results = [];
     while (count != 0) {
         var topLength = -1;
@@ -81,6 +95,7 @@ var getStats = function (word, type, resultCallback) {
     */
     async.waterfall([
         function getRepos(callback) {
+            console.log('Получение текстов репозиториев ... ');
             request({
                 url: GITHUB_API_URL + '/orgs/urfu-2015/repos?access_token=' + oauth_token,
                 method: 'GET',
@@ -135,6 +150,7 @@ var getStats = function (word, type, resultCallback) {
             });
         },
         function getRoots(words, callback) {
+            console.log('Слова получены. Обработка корней ...');
             /*
                 Алгоритм получения корня:
                 1) находим на странице слово 'корень'
@@ -143,6 +159,8 @@ var getStats = function (word, type, resultCallback) {
                    начинаем считывать корень до ']'
              */
             var rootObject = [];
+            var wordsLength = words.length;
+            var countWordsLength = 0;
             async.eachSeries(words, function (key, next) {
                 var encodeWord = encodeURI('разбор/по-составу/' + key);
                 request({
@@ -176,6 +194,8 @@ var getStats = function (word, type, resultCallback) {
                         rootObject.push([result, [key]]);
                     }
                     next();
+                    countWordsLength += 1;
+                    console.log('Обработано: ' + countWordsLength + ' / ' + words.length - 1);
                 });
             }, function (err, results) {
                 callback(null, rootObject);
@@ -222,3 +242,4 @@ module.exports.top = function (count, resultCallback) {
         getStats(count, 'top', resultCallback);
     }
 };
+
