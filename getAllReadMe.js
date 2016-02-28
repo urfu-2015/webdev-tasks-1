@@ -1,55 +1,46 @@
 'use strict';
 
-const request = require('request');
 const fs = require('fs');
+const Github = require('github');
+const co = require('co');
+const coGit = require('co-github');
 
-var token = 'token ' + fs.readFileSync('key.txt', 'utf-8').trim();
-var host = 'https://api.github.com';
-var headers = {
-    Authorization: token,
-    'User-agent': 'node.js'
-};
+var token = fs.readFileSync('key.txt', 'utf-8').trim();
 
-function getRepositoriesNames(user, callback) {
-    var url = host + '/users/' + user + '/repos';
-    request({url: url, headers: headers}, function (err, res, body) {
-        if (err) {
-            callback(err);
-            return;
-        }
-        var reposNames = JSON.parse(body)
-            .map(function (repos) {
-                return repos.name;
-            })
-            .filter(function (name) {
-                return name.indexOf('task') > -1;
-            });
+var gh = new Github({
+    version: '3.0.0'
+});
 
-        callback(null, reposNames);
-    });
-}
+gh.authenticate({
+    type: 'oauth',
+    token: token
+});
 
-var getAllReadMe = function (user, callback) {
-    getRepositoriesNames(user, function (err, repositoriesNames) {
-        if (!repositoriesNames) {
-            callback(new Error('Не получены репозитории'));
-            return;
-        }
-        var count = repositoriesNames.length;
-        repositoriesNames.forEach(function (name, i) {
-            var url = host + '/repos/' + user + '/' + name + '/readme';
-            request({
-                url: url,
-                headers: headers}, function (err, res, body) {
-                var buffer = new Buffer(JSON.parse(body).content, 'base64');
-                repositoriesNames[i] = buffer.toString('utf-8');
-                count--;
-                if (!count) {
-                    callback(null, repositoriesNames);
-                }
+var github = coGit(gh);
+
+
+var readMeTexts = co.wrap(function *(user) {
+    var userData = yield github.repos.getFromUser({user: user});
+    var repositoriesPromises = userData
+        .map(function (repo) {
+            return repo.name;
+        })
+        .filter(function (name) {
+            return name.indexOf('tasks') > -1;
+        })
+        .map(function (name) {
+            return github.repos.getReadme({
+                user: user,
+                repo: name
             });
         });
-    });
-};
+    var reposData = yield repositoriesPromises;
+    return reposData
+        .map(function (readMeData) {
+            var buffer = new Buffer(readMeData.content, 'base64');
+            return buffer.toString();
+        });
+});
 
-module.exports = getAllReadMe;
+module.exports = readMeTexts;
+

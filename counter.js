@@ -4,24 +4,21 @@ const getAllReadMe = require('./getAllReadMe');
 const fs = require('fs');
 const natural = require('natural');
 
-function applyToReadMe(callback) {
-    var user = 'urfu-2015';
-    getAllReadMe(user, function (err, texts) {
-        if (err) {
-            throw err;
-        }
-        fs.readFile('excludedWords.json', 'utf-8', function (err, data) {
-            data = JSON.parse(data);
-            var types = Object.keys(data);
-            var excludedWords = types.reduce(function (words, type) {
+function normalizeReadMeTexts(user, callback) {
+    var readMeTexts = getAllReadMe(user);
+    fs.readFile('excludedWords.json', 'utf-8', function (err, data) {
+        data = JSON.parse(data);
+        var WordTypes = Object.keys(data);
+        var excludedWords = WordTypes.reduce(function (words, type) {
                 return words.concat(data[type]);
             }, [])
-                .map(function (word) {
-                    return word.toLowerCase();
-                });
-            var regExp = /[^А-Яа-я]+/g;
-            var words = texts.reduce(function (words, readMe) {
-                var newWords = readMe.replace(regExp, ' ')
+            .map(function (word) {
+                return word.toLowerCase();
+            });
+        var regExp = /[^а-яё]+/g;
+        readMeTexts.then(function (texts) {
+            var words = texts.reduce(function (words, text) {
+                var newWords = text.replace(regExp, ' ')
                     .trim()
                     .split(' ')
                     .map(function (word) {
@@ -33,12 +30,20 @@ function applyToReadMe(callback) {
                 return words.concat(newWords);
             }, []);
             callback(null, words);
+        }, function (err) {
+            callback(err);
         });
     });
 }
 
-var count = function (word) {
-    applyToReadMe(function (err, words) {
+var user = 'urfu-2015';
+
+var count = function (word, callback) {
+    normalizeReadMeTexts(user, function (err, words) {
+        if (err) {
+            callback(err);
+            return;
+        }
         var count = 0;
         var rootWord = natural.PorterStemmerRu.stem(word);
 
@@ -48,12 +53,16 @@ var count = function (word) {
                 count++;
             }
         });
-        console.log(count);
+        callback(null, count);
     });
 };
 
-var top = function (n) {
-    applyToReadMe(function (err, words) {
+var top = function (n, callback) {
+    normalizeReadMeTexts(user, function (err, words) {
+        if (err) {
+            callback(err);
+            return;
+        }
         var statistics = {};
 
         words.forEach(function (word) {
@@ -91,11 +100,9 @@ var top = function (n) {
             }
             return res + '\n\r' + line;
         }, '');
-        console.log(res);
+        callback(null, res);
     });
 };
-
-
 
 module.exports = {
     top: top,
