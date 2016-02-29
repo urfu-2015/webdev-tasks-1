@@ -1,24 +1,19 @@
 'use strict';
-var request = require('./node_modules/sync-request');
-var natural = require('natural').PorterStemmerRu;
 var fs = require('fs');
 var token = fs.readFileSync('./key.txt', 'utf-8');
-//console.log(natural.stem('бабуленькиных'));
 
-function options () {
+function options() {
     return {
         headers: {
             'User-Agent': 'request'
         },
         qs: {
-            access_token: token // -> uri + '?access_token=xxxxx%20xxxxx'
+            access_token: token // -> url + '?access_token=xxxxx'
         }
-    }
+    };
 }
 
-//TODO заменить перед PR имя репозитория!!!
-
-function getRepos (listOfReposData) {
+function getRepos(listOfReposData) {
     var listOfRepos = [];
     var repoInfo = JSON.parse(listOfReposData);
     for (var i in repoInfo) {
@@ -27,7 +22,7 @@ function getRepos (listOfReposData) {
     return listOfRepos;
 }
 
-function sanitize (text) {
+function sanitize(text) {
     text = text.replace(/\r\n/g, ' ')
         .replace(/<img.+>/g, ' ')
         .replace(/https?:\/\/(\w+\.)+\w+\/([\w\-]+\/?)+(\.\w+)*/g, ' ')
@@ -46,52 +41,53 @@ function sanitize (text) {
     if (arrOfPrepsAndConjs[arrOfPrepsAndConjs.length - 1].length === 0) {
         arrOfPrepsAndConjs.pop();
     }
-    //console.log(arrOfPrepsAndConjs);
 
     for (var i in textArray) {
-        //var word = textArray[i].toLowerCase();
         if (textArray[i] === '') {
             textArray.splice(i, 1);
             continue;
         }
+
         if (arrOfPrepsAndConjs.indexOf(textArray[i].toLowerCase()) + 1) {
             textArray.splice(i, 1);
         }
     }
+    return textArray;
 }
-/**
- * @param1 слово, у которого смотрим повторы, или число для рейтинга самых частых слов
- * @param2 навальное значение числа повторений слова или пустой словарь повторов слов
- */
-function sendRequest (param1, param2) {
-    var list = request('GET', 'https://api.github.com/users/urfu-2015/repos', options())
-        .getBody('utf8');
 
-    var listOfRepos = getRepos(list);
-    for (var i in listOfRepos) {
-        console.log('Смотрим репозиторий ' + listOfRepos[i]);
-        var response = request('GET', 'https://raw.githubusercontent.com/urfu-2015/' +
-            listOfRepos[i] + '/master/README.md', options());
-        if (response.statusCode === 200) {
-            var plainTextArray = sanitize(response.getBody('utf8'));
-            for (var k in plainTextArray) {
-                var word = plainTextArray[k].toLowerCase();
-                if (typeof param1 === 'string') {
-                    //TODO стеммить
-                    if (word === param1) {
-                        param2++;
-                    }
-                } else {
-                    if (Object.keys(param2).indexOf(word) < 0) {
-                        param2[word] = 1;
-                    } else {
-                        param2[word]++;
-                    }
-                }
+function stemWord(word) {
+    var natural = require('natural').PorterStemmerRu;
+    return natural.stem(word);
+}
+
+function stemKeys(dictionary) {
+    var keys = Object.keys(dictionary);
+    for (var i in keys) {
+        keys[i] = stemWord(keys[i]);
+    }
+    return keys;
+}
+
+var request = require('./node_modules/sync-request');
+var repeatsOfWords = {};
+var list = request('GET', 'https://api.github.com/users/urfu-2015/repos', options())
+    .getBody('utf8');
+var listOfRepos = getRepos(list);
+for (var i in listOfRepos) {
+    //console.log('Смотрим репозиторий ' + listOfRepos[i]);
+    var response = request('GET', 'https://raw.githubusercontent.com/urfu-2015/' +
+        listOfRepos[i] + '/master/README.md', options());
+    if (response.statusCode === 200) {
+        var plainTextArray = sanitize(response.getBody('utf8'));
+        for (var k in plainTextArray) {
+            var word = plainTextArray[k].toLowerCase();
+            if (stemKeys(repeatsOfWords).indexOf(stemWord(word)) < 0) {
+                repeatsOfWords[word] = 1;
+            } else {
+                repeatsOfWords[word]++;
             }
         }
     }
-    return param2;
 }
 
 module.exports.count = function (word) {
@@ -103,15 +99,14 @@ module.exports.count = function (word) {
         console.log('Введите непустое слово для проверки');
         return;
     }
-    var repeats = 0;
-    repeats = sendRequest(word, repeats);
 
-    if (repeats === 0) {
+    var stemmedWordIndex = stemKeys(repeatsOfWords).indexOf(stemWord(word));
+    if (stemmedWordIndex < 0) {
         console.log('Такого слова нам не встречалось');
         return;
     }
-
-    console.log(word + ':' + repeats);
+    var numOfRepeats = repeatsOfWords[Object.keys(repeatsOfWords)[stemmedWordIndex]];
+    console.log(word + ': ' + numOfRepeats);
 };
 
 module.exports.top = function (n) {
@@ -124,15 +119,13 @@ module.exports.top = function (n) {
         return;
     }
 
-    var repeatsOfWords = {};
-    repeatsOfWords = sendRequest(n, repeatsOfWords);
-    console.log(repeatsOfWords);
+    //console.log(repeatsOfWords);
     if (n > Object.keys(repeatsOfWords).length) {
         console.log('Нет в текстах столько слов');
         return;
     }
 
-    var sortedByValue = Object.keys(repeatsOfWords).sort(function(a, b){
+    var sortedByValue = Object.keys(repeatsOfWords).sort(function (a, b) {
         return repeatsOfWords[b] - repeatsOfWords[a];
     }).slice(0, n);
     for (var i in sortedByValue) {
