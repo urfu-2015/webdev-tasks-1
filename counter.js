@@ -24,16 +24,18 @@ exports.count = function (word) {
 
 function sendRequest(callback) {
     request(getRequest(url), function (err, res, body) {
-        if (!err && res.statusCode === 200) {
-            var data = JSON.parse(body);
-            var dataWithTasks = data.filter(function (elem) {
-                return (elem.name.indexOf('javascript-tasks') !== -1 ||
-                        elem.name.indexOf('verstka-tasks') !== -1);
-            });
-            processTexts(dataWithTasks, callback);
-        } else {
-            console.log(err);
+        if (err) {
+            throw err;
         }
+        if (res.statusCode !== 200) {
+            throw new Error('Server returns ' + res.statusCode);
+        }
+        var data = JSON.parse(body);
+        var dataWithTasks = data.filter(function (elem) {
+            return (elem.name.indexOf('javascript-tasks') !== -1 ||
+                    elem.name.indexOf('verstka-tasks') !== -1);
+        });
+        processTexts(dataWithTasks, callback);
     });
 }
 
