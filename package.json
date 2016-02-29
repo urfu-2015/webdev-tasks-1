@@ -3,6 +3,7 @@
   "dependencies": {
     "jscs": "^2.2.1",
     "mocha": "^2.3.3",
+    "natural": "^0.2.1",
     "request": "^2.69.0",
     "sync-request": "^3.0.0"
   },

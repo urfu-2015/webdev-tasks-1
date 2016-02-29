@@ -6,7 +6,8 @@ var stemmer = natural.PorterStemmerRu;
 stemmer.attach();
 const fs = require('fs');
 const token = fs.readFileSync('token.txt');
-var forbidden_words = ['в', 'на', 'и', 'не', 'по', 'у', 'к', 'с', 'а', 'для', 'при'];
+const url = require('url');
+var forbiddenWords = ['в', 'на', 'и', 'не', 'по', 'у', 'к', 'с', 'а', 'для', 'при'];
 
 module.exports.top = function (amount) {
     var dict = GetDictionary('orgs/urfu-2015/repos');
@@ -19,44 +20,51 @@ module.exports.top = function (amount) {
 module.exports.count = function (word) {
     word = word.stem();
     var dict = GetDictionary('orgs/urfu-2015/repos');
-    if (dict[word]) {
-        console.log(word + ': ' + dict[word]);
-    } else {
-        console.log(word + ': 0');
-    }
+    var amount = dict[word] ? dict[word] : '0';
+    console.log(word + ': ' + amount);
 };
 
 var GetDictionary = function (query) {
     var readmes = [];
-    var data = request('GET', 'https://api.github.com/' + query + '?access_token=' + token,
+    var data = request('GET', url.format({
+        protocol: 'https',
+        hostname: 'api.github.com',
+        pathname: query,
+        search: '?access_token=' + token}),
         {headers: {'User-Agent': 'Readme Analyzer'}});
     var repos = JSON.parse(data.getBody());
     for (var repo in repos) {
-        if (repos[repo] &&
-            ((repos[repo].full_name.indexOf('verstka-tasks') != -1) ||
-            (repos[repo].full_name.indexOf('javascript-tasks') != -1))) {
-            data = request('GET', 'https://api.github.com/repos/' + repos[repo].full_name +
-                '/readme?access_token=' + token, {headers: {'User-Agent': 'Readme Analyzer'}});
+        if (isRepoSatisfying(repos[repo])) {
+            data = request('GET', url.format({
+                protocol: 'https',
+                hostname: 'api.github.com',
+                pathname: 'repos/' + repos[repo].full_name + '/readme',
+                search: '?access_token=' + token}), {headers: {
+                    'User-Agent': 'Readme Analyzer',
+                    Accept: 'application/vnd.github.VERSION.raw'}});
             if (data) {
-                var readme = JSON.parse(data.getBody());
-                var readme_data = request('GET', readme.download_url,
-                    {headers: {'User-Agent': 'Readme Analyzer'}});
-                var text = readme_data.getBody().toString();
+                var text = data.getBody().toString();
                 readmes.push(text.tokenizeAndStem(true));
             }
         }
     }
     var readmes_text = readmes.reduce(function (a, b) {
         return a.concat(b);
-    });
+    }, []);
     var dict = {};
     readmes_text.forEach(function (current, index, array) {
-        if (/^[а-яА-Я]+$/.test(current) && forbidden_words.indexOf(current) == -1) {
+        if (/^[а-яё]+$/i.test(current) && forbiddenWords.indexOf(current) == -1) {
             dict[current] = dict[current] ? dict[current] + 1 : 1;
         }
     });
     return dict;
 };
+
+function isRepoSatisfying(repo) {
+    return repo &&
+        (repo.full_name.indexOf('verstka-tasks') != -1 ||
+        repo.full_name.indexOf('javascript-tasks') != -1);
+}
 
 function bySortedValue(obj, iterations_amount, callback) {
     var tuples = [];
