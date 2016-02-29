@@ -9,7 +9,7 @@
   "devDependencies": {
     "jscs": "^2.2.1",
     "mocha": "^2.3.3"
-  }
+  },
   "scripts": {
     "lint": "jscs ."
   }
