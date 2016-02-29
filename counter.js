@@ -22,18 +22,17 @@ function getRepos(listOfReposData) {
     return listOfRepos;
 }
 
+var prepsAndConjs = fs.readFileSync('./forbiddenWords.txt', 'utf-8');
 function sanitize(text) {
     text = text.replace(/\r\n/g, ' ')
         .replace(/<img.+>/g, ' ')
-        .replace(/https?:\/\/(\w+\.)+\w+\/([\w\-]+\/?)+(\.\w+)*/g, ' ')
+        .replace(/https?:\/\/(\w+\.)+\w+\/([\w\-=\?]+\/?)+(\.\w+)*/g, ' ')
         .replace(/[^a-zа-яё\-']+/ig, ' ')
-        .replace(/'([а-я])/, '$1') // апостроф в формах слов
-        .replace(/ -+ /ig, ' ') // длинные и короткие тире
-        .replace(/([а-яa-z])- /, '$1 ') // дефисы, оставшиеся после обрезки числовой части
-        .replace(/\s{2,}/g, ' '); // пробелы, количеством больше одного
+        .replace(/'([а-я])/ig, '$1') // апостроф в формах слов
+        .replace(/ -+ /g, ' ') // длинные и короткие тире
+        .replace(/([а-яa-z])- /ig, '$1 ') // дефисы, оставшиеся после обрезки числовой части
+        .replace(/\s{2,}/g, ' '); // пробелы количеством больше одного
     var textArray = text.split(' ');
-    var prepsAndConjs =
-        fs.readFileSync('./forbiddenWords.txt', 'utf-8');
     var arrOfPrepsAndConjs = prepsAndConjs.split('\n');
 
     // сама собой в конце файла возникает переход на след. строку,
@@ -41,18 +40,16 @@ function sanitize(text) {
     if (arrOfPrepsAndConjs[arrOfPrepsAndConjs.length - 1].length === 0) {
         arrOfPrepsAndConjs.pop();
     }
+    var result = [];
 
     for (var i in textArray) {
-        if (textArray[i] === '') {
-            textArray.splice(i, 1);
+        if (textArray[i].length <= 1 ||
+            arrOfPrepsAndConjs.indexOf(textArray[i].toLowerCase()) + 1) {
             continue;
         }
-
-        if (arrOfPrepsAndConjs.indexOf(textArray[i].toLowerCase()) + 1) {
-            textArray.splice(i, 1);
-        }
+        result.push(textArray[i]);
     }
-    return textArray;
+    return result;
 }
 
 function stemWord(word) {
