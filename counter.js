@@ -4,7 +4,7 @@ const fs = require('fs');
 const request = require('request');
 const natural = require('natural');
 const token = fs.readFileSync('./key.txt', 'utf-8');
-const ignoreWords = JSON.parse(fs.readFileSync('./ignoreWords.json', 'utf-8')).words;
+const ignoredWords = require('./ignoreWords').words;
 
 var url = 'https://api.github.com/users/urfu-2015/repos';
 var repoURL = 'https://api.github.com/repos/urfu-2015/';
@@ -52,22 +52,24 @@ function processTexts(repos, callback) {
     for (var i = 0; i < repos.length; i++) {
         var urlWithName = repoURL + repos[i].name + '/readme';
         request(getRequest(urlWithName), function (err, res, body) {
-            if (!err && res.statusCode === 200) {
-                var data = JSON.parse(body);
-                var text = new Buffer(data.content, 'base64').toString('utf-8').toLowerCase();
-                var words = text.replace(/[^ёа-я]/g, ' ')
-                                .replace(/\s+/g, ' ')
-                                .split(' ');
-                words = words.filter(function (word) {
-                    return word.length > 0 && ignoreWords.indexOf(word) === -1;
-                });
-                freqOfWords = processWords(words, freqOfWords);
-                count += 1;
-                if (count === repos.length) {
-                    callback(freqOfWords);
-                }
-            } else {
-                console.log(err);
+            if (err) {
+                throw err;
+            }
+            if (res.statusCode !== 200) {
+                throw new Error('Server returns ' + res.statusCode);
+            }
+            var data = JSON.parse(body);
+            var text = new Buffer(data.content, 'base64').toString('utf-8').toLowerCase();
+            var words = text.replace(/[^ёа-я]/g, ' ')
+                            .replace(/\s+/g, ' ')
+                            .split(' ');
+            words = words.filter(function (word) {
+                return word.length > 0 && ignoredWords.indexOf(word) === -1;
+            });
+            freqOfWords = processWords(words, freqOfWords);
+            count += 1;
+            if (count === repos.length) {
+                callback(freqOfWords);
             }
         });
     }
