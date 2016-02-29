@@ -4,12 +4,53 @@ var taskList = [];
 const https = require('https');
 const badWords = require('./badWords.js');
 
+var httpClient = {
+    requestsSent: 0,
+    responsesReceived: 0,
+    sendHttpReq: function (path, callback) {
+        var json;
+        var options = {
+            hostname: 'api.github.com',
+            port: 443,
+            path: path,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'My-Test-App',
+                //Authorization:,
+                Accept: 'application/vnd.github.v3+json'
+            }
+        };
+        this.requestsSent++;
+        var req = https.request(options, (res) => {
+            res.setEncoding('utf8');
+            var data = '';
+            res.on('data', (d) => {
+                data += d;
+            });
+
+            res.on('end', () => {
+                var response = JSON.parse(data);
+                if (res.statusCode !== 200) {
+                    console.log('Ошибка: HTTP ' + res.statusCode);
+                    console.log(response.message);
+                    console.log(response.documentation_url);
+                    return;
+                }
+                this.responsesReceived++;
+                callback(response);
+            });
+        });
+        req.end();
+    }
+};
+Object.defineProperty(httpClient, 'areResponsesReceived', {
+    get: function () {
+        return this.requestsSent === this.responsesReceived;
+    },
+    enumerable: true
+});
+
 var WordFrequency = function (text) {
-    Object.defineProperty(this, 'size', {
-        value: function () {
-            return Object.keys(this).length;
-        }
-    });
     Object.defineProperty(this, 'join', {
         value: function (wordFreq) {
             var newWordFreq = new WordFrequency();
@@ -120,63 +161,18 @@ var WordFrequency = function (text) {
     }
 };
 
-var overallWordFreq = new WordFrequency();
-
-var sendHttpReq = function (path, callback) {
-    var json;
-    var options = {
-        hostname: 'api.github.com',
-        port: 443,
-        path: path,
-        method: 'GET',
-        headers: {
-            'User-Agent': 'My-Test-App',
-            //Authorization:,
-            Accept: 'application/vnd.github.v3+json'
-        }
-    };
-
-    var req = https.request(options, function (res) {
-        res.setEncoding('utf8');
-        var data = '';
-        res.on('data', (d) => {
-            data += d;
-        });
-
-        res.on('end', function () {
-            var response = JSON.parse(data);
-            if (res.statusCode !== 200) {
-                console.log('Ошибка: HTTP ' + res.statusCode);
-                console.log(response.message);
-                console.log(response.documentation_url);
-                return;
-            }
-            callback(response);
-        });
-    });
-    req.end();
-};
-
-var getRepos = function () {
-    sendHttpReq('/orgs/urfu-2015/repos', getTasks);
-};
-
 var getTasks = function (response) {
-    var taskCounter = 0;
-    var tasksParsedCounter = 0;
-    response.forEach(function (entry) {
+    response.forEach(function (task) {
         if (
-            entry.name.indexOf('verstka-tasks-') !== -1 ||
-            entry.name.indexOf('javascript-tasks-') !== -1
+            task.name.indexOf('verstka-tasks-') !== -1 ||
+            task.name.indexOf('javascript-tasks-') !== -1
         ) {
-            taskCounter++;
-            var path = '/repos/urfu-2015/' + entry.name + '/contents/README.md?ref=master';
-            sendHttpReq(path, function (response) {
+            var readmePath = '/repos/urfu-2015/' + task.name + '/contents/README.md?ref=master';
+            httpClient.sendHttpReq(readmePath, function (response) {
                 var taskText = (new Buffer(response.content, 'base64')).toString('utf-8');
                 var taskWordFreq = new WordFrequency(taskText);
                 overallWordFreq = overallWordFreq.join(taskWordFreq);
-                tasksParsedCounter++;
-                if (taskCounter === tasksParsedCounter) {
+                if (httpClient.areResponsesReceived) {
                     taskList.forEach(func => {
                         func();
                     });
@@ -186,20 +182,29 @@ var getTasks = function (response) {
     });
 };
 
-getRepos();
+var overallWordFreq = new WordFrequency();
+httpClient.sendHttpReq('/orgs/urfu-2015/repos', getTasks);
 
 module.exports.count = function (word) {
-    taskList.push(
-        function () {
-            overallWordFreq.count(word);
-        }
-    );
+    if (httpClient.areResponsesReceived) {
+        overallWordFreq.count(word);
+    } else {
+        taskList.push(
+            function () {
+                overallWordFreq.count(word);
+            }
+        );
+    }
 };
 
 module.exports.top = function (number) {
-    taskList.push(
-        function () {
-            overallWordFreq.top(number);
-        }
-    );
+    if (httpClient.areResponsesReceived) {
+        overallWordFreq.top(number);
+    } else {
+        taskList.push(
+            function () {
+                overallWordFreq.top(number);
+            }
+        );
+    }
 };
