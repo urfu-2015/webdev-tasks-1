@@ -127,6 +127,9 @@ var getStats = function (word, type, resultCallback) {
                         method: 'GET',
                         headers: {'user-agent': 'mdf-app'}
                     }, function (errorRepo, responseRepo, bodyRepo) {
+                        if (DEBUG) {
+                            console.log('Обрабатывается: ' + bodyJSON[key].full_name);
+                        }
                         result.push(JSON.parse(bodyRepo));
                         next();
                     });
