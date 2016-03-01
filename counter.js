@@ -59,8 +59,8 @@ function sendRequest(path) {
 
 function isRepoSatisfying(repo) {
     return repo &&
-        (repo.full_name.indexOf('verstka-tasks-1') != -1 ||
-        repo.full_name.indexOf('javascript-tasks-1') != -1);
+        (repo.full_name.indexOf('verstka-tasks') != -1 ||
+        repo.full_name.indexOf('javascript-tasks') != -1);
 }
 
 function bySortedValue(obj, iterationsAmount, callback) {
