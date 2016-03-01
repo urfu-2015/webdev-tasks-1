@@ -1,6 +1,7 @@
-const request = require('sync-request');
+const request = require('request');
 const fs = require('fs');
 const natural = require('natural');
+const async = require('async');
 
 const badWords = ['не', 'в', 'на', 'к', 'из', 'по', 'а', 'и', 'над', 'у', 'под', 'для', 'за', 'с'];
 const wordRE = /([а-яё]+)/gi;
@@ -11,19 +12,26 @@ var cachedDictionary;
 module.exports.top = getTopWords;
 module.exports.count = getWordCount;
 
-function getReadme(repoName) {
-    var result = request('GET', 'https://api.github.com/repos/urfu-2015/' + repoName + '/readme', {
+function getReadme(repoName, callback) {
+    request({
+        url: 'https://api.github.com/repos/urfu-2015/' + repoName + '/readme',
+        encoding: 'utf-8',
         headers: {
             'User-Agent': 'NikShel',
             Authorization: 'token ' + GITHUB_TOKEN,
             Host: 'api.github.com'
         }
+    }, function (error, response, body) {
+        if (error || response.statusCode !== 200) {
+            throw Error('Ошибка при запросе к серверу: ' + error);
+        }
+        var resultJson = JSON.parse(body);
+        if (resultJson.encoding != 'base64') {
+            throw new Error('Формат не поддерживается');
+        }
+        var text = Buffer(resultJson.content, 'base64').toString('utf-8');
+        callback(text);
     });
-    var resultJson = JSON.parse(result.getBody('utf-8'));
-    if (resultJson.encoding != 'base64') {
-        throw new Error('Формат не поддерживается');
-    }
-    return new Buffer(resultJson.content, 'base64').toString('utf-8');
 }
 
 function getWordsFromText(text) {
@@ -40,71 +48,82 @@ function addWords(dictionary, words) {
     words.forEach(function (word) {
         var stem = natural.PorterStemmerRu.stem(word);
         if (dictionary[stem] == undefined) {
-            dictionary[stem] = [1, word];
+            dictionary[stem] = 1;
         } else {
-            dictionary[stem][0]++;
+            dictionary[stem]++;
         }
     });
 }
 
-function getDictionary() {
+function getDictionary(callback) {
     if (cachedDictionary != undefined) {
-        return cachedDictionary;
+        callback(cachedDictionary);
+        return;
     }
     var dictionary = {};
-    for (var i = 0; i < 10; i++) {
+    var tasks = [];
+    for (var i = 1; i <= 10; i++) {
         ['verstka-tasks-', 'javascript-tasks-'].forEach(function (repoName) {
-            var fullRepoName = repoName + (i + 1).toString();
-            var text = getReadme(fullRepoName);
-            console.log('Обработан репозиторий  ' + fullRepoName);
-            var words = getWordsFromText(text);
-            addWords(dictionary, words);
+            var currentIndex = i;
+            tasks.push(function (localCallback) {
+                var fullRepoName = repoName + currentIndex.toString();
+                getReadme(fullRepoName, function (text) {
+                    var words = getWordsFromText(text);
+                    addWords(dictionary, words);
+                    console.log('Обработан репозиторий  ' + fullRepoName);
+                    localCallback();
+                });
+            });
         });
-
     }
-    cachedDictionary = dictionary;
-    return dictionary;
+    async.parallel(tasks, function () {
+        cachedDictionary = dictionary;
+        callback(dictionary);
+    });
 }
 
-function getWordCount(word) {
+function getWordCount(word, callback) {
     var stem = natural.PorterStemmerRu.stem(word);
-    var dictionary = getDictionary();
-    if (dictionary[stem] == undefined) {
-        return 0;
-    }
-    return dictionary[stem][0];
+    getDictionary(function (dictionary) {
+        var count = dictionary[stem];
+        callback(count);
+    });
 }
 
-function getTopWords(n) {
-    var dictionary = getDictionary();
-    return Object.keys(dictionary)
-        .map(function (key) {
-            return dictionary[key];
-        })
-        .sort(function (item1, item2) {
-            if (item1[0] > item2[0]) {
-                return -1;
-            }
-            if (item1[0] < item2[0]) {
-                return 1;
-            }
-            return 0;
-        })
-        .slice(0, n)
-        .map(function (entry) {
-            return entry[1] + ' ' + entry[0];
-        });
+function getTopWords(n, callback) {
+    getDictionary(function (dictionary) {
+        var result = Object.keys(dictionary)
+            .map(function (key) {
+                return {
+                    stem: key,
+                    count: dictionary[key]
+                };
+            })
+            .sort(function (item1, item2) {
+                if (item1.count > item2.count) {
+                    return -1;
+                }
+                if (item1.count < item2.count) {
+                    return 1;
+                }
+                return 0;
+            })
+            .slice(0, n)
+            .map(function (item) {
+                return item.stem + ' --- ' + item.count;
+            });
+        callback(result);
+    });
 }
 
 function test() {
-    var topWords = getTopWords(10);
-    console.log('Топ 10 слов:');
-    topWords.forEach(function (result) {
-        console.log(result);
+    getTopWords(10, function (topWords) {
+        console.log('Топ 10 основ слова:');
+        topWords.forEach(function (result) {
+            console.log(result);
+        });
+        getWordCount('элементы', function (count) {
+            console.log('Слова с основой как у слова "элементы" встречаются ' + count + ' раз');
+        });
     });
-
-    var count = getWordCount('элемент');
-    console.log('Слово "элемент" встречается ' + count + ' раз');
 }
-
-
