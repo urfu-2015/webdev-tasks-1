@@ -2,21 +2,28 @@
 const request = require('request');
 const fs = require('fs');
 const natural = require('natural');
+const url = require('url');
 const OAUTH_TOKEN = fs.readFileSync('./key.txt', 'utf-8');
-const FREQUENCY_DICT = [];
+const frequencyDict = [];
 let data_analyzed = false;
-let deferredAction = [];
+const deferredAction = [];
 const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
-const gitUrl = 'https://api.github.com';
+const GIT_URL = 'api.github.com';
 
 let promise = new Promise(function (resolve, reject) {
-    let mainRequest = {
-        url: gitUrl + '/orgs/urfu-2015/repos?access_token=' + OAUTH_TOKEN,
+    let address = url.format({
+        protocol: 'https',
+        host: GIT_URL,
+        pathname: '/orgs/urfu-2015/repos',
+        search: '?access_token=' + OAUTH_TOKEN,
+    });
+    let options = {
+        url: address,
         headers: {
             'User-Agent': 'request'
         }
     };
-    request(mainRequest, function (error, response, body) {
+    request(options, function (error, response, body) {
         if (error || response.statusCode !== 200) {
             reject(error ? error : 'statusCode is not 200');
         }
@@ -42,22 +49,25 @@ let promise = new Promise(function (resolve, reject) {
     });
 });
 
-
-
 function processingREADME(name, callback) {
-    let getRequest = {
-        url: gitUrl + '/repos/urfu-2015/' + name +
-         '/readme?access_token=' + OAUTH_TOKEN,
+    let address = url.format({
+        protocol: 'https',
+        host: GIT_URL,
+        pathname: '/repos/urfu-2015/' + name + '/readme',
+        search: '?access_token=' + OAUTH_TOKEN,
+    });
+    let options = {
+        url: address,
         headers: {
             'User-Agent': 'request'
         }
     };
-    request(getRequest, function (error, response, body) {
+    request(options, function (error, response, body) {
         if (!error && response.statusCode === 200) {
             processingText(JSON.parse(body).content);
             callback(null);
         } else {
-            callback('ERROR');
+            callback(error ? error : 'statusCode is not 200');
         }
     });
 }
@@ -84,11 +94,11 @@ function addToFrequencyArray(wordArray) {
         let added = false;
         let fullWord = wordArray[i];
         let stemWord = natural.PorterStemmerRu.stem(fullWord);
-        for (let j = 0; j < FREQUENCY_DICT.length; j++) {
-            if (natural.JaroWinklerDistance(fullWord, FREQUENCY_DICT[j].key) > 0.85) {
-                FREQUENCY_DICT[j].count += 1;
-                if (FREQUENCY_DICT[j].fullWords.indexOf(fullWord) === -1) {
-                    FREQUENCY_DICT[j].fullWords.push(fullWord);
+        for (let j = 0; j < frequencyDict.length; j++) {
+            if (natural.JaroWinklerDistance(fullWord, frequencyDict[j].key) > 0.85) {
+                frequencyDict[j].count += 1;
+                if (frequencyDict[j].fullWords.indexOf(fullWord) === -1) {
+                    frequencyDict[j].fullWords.push(fullWord);
                 }
                 added = true;
                 break;
@@ -97,10 +107,10 @@ function addToFrequencyArray(wordArray) {
         if (added) {
             continue;
         }
-        FREQUENCY_DICT.push({});
-        FREQUENCY_DICT[FREQUENCY_DICT.length - 1].key = stemWord;
-        FREQUENCY_DICT[FREQUENCY_DICT.length - 1].count = 1;
-        FREQUENCY_DICT[FREQUENCY_DICT.length - 1].fullWords = [fullWord];
+        frequencyDict.push({});
+        frequencyDict[frequencyDict.length - 1].key = stemWord;
+        frequencyDict[frequencyDict.length - 1].count = 1;
+        frequencyDict[frequencyDict.length - 1].fullWords = [fullWord];
     }
 }
 
@@ -116,14 +126,14 @@ exports.top = function (n) {
         };
     }(n));
     return promise.then(
-    result => {
-        data_analyzed = true;
-        while (deferredAction.length !== 0) {
-            let action = deferredAction.shift();
-            return action();
-        }
-    },
-    error => console.log(error)
+        result => {
+            data_analyzed = true;
+            while (deferredAction.length !== 0) {
+                let action = deferredAction.shift();
+                return action();
+            }
+        },
+        error => console.log(error)
     );
 };
 
@@ -139,31 +149,31 @@ exports.count = function (word) {
         };
     }(word));
     return promise.then(
-    result => {
-        data_analyzed = true;
-        while (deferredAction.length !== 0) {
-            let action = deferredAction.shift();
-            return action();
-        }
-    },
-    error => console.log(error)
+        result => {
+            data_analyzed = true;
+            while (deferredAction.length !== 0) {
+                let action = deferredAction.shift();
+                return action();
+            }
+        },
+        error => console.log(error)
     );
 };
 
 function hiddenTop(n) {
-    FREQUENCY_DICT.sort(compare);
-    FREQUENCY_DICT.reverse();
+    frequencyDict.sort(compare);
+    frequencyDict.reverse();
     let result = [];
-    for (let i = 0; i < Math.min(n, FREQUENCY_DICT.length); i++) {
-        result.push(FREQUENCY_DICT[i].fullWords[0] + ' ' + FREQUENCY_DICT[i].count);
+    for (let i = 0; i < Math.min(n, frequencyDict.length); i++) {
+        result.push(frequencyDict[i].fullWords[0] + ' ' + frequencyDict[i].count);
     };
     return result.join('\n');
 }
 
 function hiddenCount(word) {
-    for (let i = 0; i < FREQUENCY_DICT.length; i++) {
-        if (natural.JaroWinklerDistance(word, FREQUENCY_DICT[i].key) > 0.85) {
-            return FREQUENCY_DICT[i].count;
+    for (let i = 0; i < frequencyDict.length; i++) {
+        if (natural.JaroWinklerDistance(word, frequencyDict[i].key) > 0.85) {
+            return frequencyDict[i].count;
         }
     }
     return 'word is not found';
