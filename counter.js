@@ -2,10 +2,10 @@
 var Promise = require('bluebird');
 var request = require('request');
 var RussianStemmer = require('snowball-stemmer.jsx/dest/russian-stemmer.common.js').RussianStemmer;
-var config = require('./config');
+var config = require('./config').config;
 
 var urls = config.repos.map(function (repo) {
-        return config.repoPath + repo + '/readme?access_token=' + config.token;
+    return config.repoPath + repo + '/readme?access_token=' + config.token;
 });
 
 var findTop = function (data) {
@@ -14,7 +14,9 @@ var findTop = function (data) {
         var result = str.match(/[а-яa-z]+/ig);
         if (result !== null) {
             for (var i = 0; i < result.length; i++) {
-                if (words.indexOf(result[i]) < 0) words.push(result[i]);
+                if (words.indexOf(result[i]) < 0) {
+                    words.push(result[i]);
+                }
             }
         }
     });
@@ -30,7 +32,9 @@ var findTop = function (data) {
                 break;
             }
         }
-        if (!exists) result.push([stem, 1, words[i]]);
+        if (!exists) {
+            result.push([stem, 1, words[i]]);
+        }
     }
     result.sort(function (a, b) {
         return b[1] - a[1];
@@ -39,7 +43,9 @@ var findTop = function (data) {
 };
 
 var printTop = function (data, n) {
-    if (n >= data.length) n = data.length -1;
+    if (n >= data.length) {
+        n = data.length - 1;
+    }
     for (var i = 0; i < n; i++) {
         console.log(data[i][2], data[i][1]);
     }
@@ -56,7 +62,7 @@ var printCount = function (data, word) {
     }
 };
 
-var generate = function(method, attr) {
+var generate = function (method, attr) {
     var res = [];
     var func;
     if (method === 'top') {
@@ -66,36 +72,31 @@ var generate = function(method, attr) {
         func = printCount;
     }
 
-    Promise.map(urls, function(url) {
+    Promise.map(urls, function (url) {
         return new Promise(function (resolve, reject) {
             var options = {
                 url: url,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36' +
+                    '(KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'
                 }
             };
             request(options, function (error, response, body) {
                 if (error || response.statusCode !== 200) {
-                    res.push('');
                     reject();
                     return;
                 }
-                const registry = JSON.parse(body);
-                res.push(new Buffer(registry.content, 'base64').toString('utf-8'));
-                resolve();
-            })
-        })
-    }).then(function() {
-        var result = findTop(res);
-        func(findTop(res), attr);
-    }).catch(function() {
+                var registry = JSON.parse(body);
+                resolve(new Buffer(registry.content, 'base64').toString('utf-8'));
+            });
+        });
+    }).then(function (dataArray) {
+        func(findTop(dataArray), attr);
+    }).catch(function (dataArray) {
         var count = 0;
-        res.forEach(function (str) {
-            if (str === '' ) count += 1;
-        }, this);
-        count = urls.length - count;
+        count = dataArray.length;
         console.log('Результаты на основе ' + count + ' задач:');
-        func(findTop(res), attr);
+        func(findTop(dataArray), attr);
     });
 };
 
