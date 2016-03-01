@@ -1,4 +1,4 @@
 var counter = require('./counter.js');
-counter.count('элемент', function (data) {
+counter.top(10, function (data) {
     console.log(data);
 });
