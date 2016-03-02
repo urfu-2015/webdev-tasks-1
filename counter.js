@@ -1,22 +1,20 @@
 const fs = require('fs');
-const http = require('http');
 const syncRequest = require("sync-request");
 const request = require("request");
-const cheerio = require("cheerio");
 const _ = require('lodash');
-
 const natural = require('natural');
+const urlLib = require('url');
+const helpers = require('./helpers');
 
-const GITHUB = 'https://api.github.com';
+const GITHUB = 'api.github.com';
 const KEY = fs.readFileSync('key.txt', 'utf-8');
-const MORPHEME_ONLINE = 'http://www.morphemeonline.ru/';
-const VNUTRI_SLOVA = 'http://vnutrislova.net/разбор/по-составу/';
 const BLACKLIST = new Set(JSON.parse(fs.readFileSync('blacklist.json')));
 const ROOTS_CACHE = new Map();
+const STEMMED_CACHE = new Map();
+const JS_TASKS = 'javascript-tasks-';
+const VERSTKA_TASKS = 'verstka-tasks-';
 
 function downloadTaskReadmes() {
-    const JS_TASKS = 'javascript-tasks-';
-    const VERSTKA_TASKS = 'verstka-tasks-';
     var tasks = "";
     for (var i = 1; i <= TASK_COUNT; i++) {
         tasks += ' ' + getReadme(JS_TASKS, i);
@@ -26,8 +24,12 @@ function downloadTaskReadmes() {
 }
 
 function getReadme(courseType, taskIndex) {
-    var url = GITHUB + '/repos/urfu-2015/' + courseType + taskIndex + '/readme' +
-        '?access_token=' + KEY;
+    var url = urlLib.format({
+        protocol: 'https:',
+        host: GITHUB,
+        pathname: '/repos/urfu-2015/' + courseType + taskIndex + '/readme',
+        search: '?access_token=' + KEY
+    });
     var options = {
         headers: {
             'User-Agent': 'request'
@@ -41,19 +43,20 @@ function getReadme(courseType, taskIndex) {
 }
 function getWordsByRoot() {
     var tasks = downloadTaskReadmes();
-    var roots = new Map();
-    tasks.forEach(taskText => {
-        var words = getWordsFromText(taskText);
-        words.forEach(word => {
+    return tasks.reduce((roots, taskText) => {
+        getWordsFromText(taskText).forEach(word => {
             var root = getWordRoot(word);
-            if (roots.has(root)) {
-                roots.get(root).push(word);
-            } else {
-                roots.set(root, [word]);
-            }
+            updateRoots(roots, root, word);
         });
-    });
-    return roots;
+    }, new Map());
+}
+
+function updateRoots(roots, root, word) {
+    if (roots.has(root)) {
+        roots.get(root).push(word);
+    } else {
+        roots.set(root, [word]);
+    }
 }
 
 function fillWordsByRootAsync(roots) {
@@ -63,104 +66,88 @@ function fillWordsByRootAsync(roots) {
     return Promise.all(words.map(w => fillRootsAsync(w, roots)));
 }
 
-var urlBuilders = {};
-urlBuilders[MORPHEME_ONLINE] = word => MORPHEME_ONLINE + word[0] + '/' + word;
-urlBuilders[VNUTRI_SLOVA] = word => VNUTRI_SLOVA + word;
-var siteParsers = {};
-siteParsers[MORPHEME_ONLINE] = body => {
-    var $ = cheerio.load(body);
-    return $('.root').text();
-};
-
-siteParsers[VNUTRI_SLOVA] = body => {
-
-    var $ = cheerio.load(body);
-    var root = $('.most-rated > p > span').text();
-    root = root.substring(root.indexOf('корень ') + 8);
-    root = root.substring(0, root.indexOf(']'));
-    return root;
-};
-
 function fillRootsAsync(word, roots, host) {
     return new Promise(resolve => {
-        host = host || VNUTRI_SLOVA;
-        if (ROOTS_CACHE.has(natural.PorterStemmer.stem(word))) {
+        host = host || helpers.VNUTRI_SLOVA;
+        var stemmedWord = STEMMED_CACHE.has(word)
+            ? STEMMED_CACHE.get(word)
+            : natural.PorterStemmerRu.stem(word);
+        STEMMED_CACHE.set(word, stemmedWord);
+        if (ROOTS_CACHE.has(stemmedWord)) {
+            roots.get(word).push(ROOTS_CACHE.get(stemmedWord));
             resolve();
-            return ROOTS_CACHE.get(natural.PorterStemmer.stem(word));
+            return;
         }
-        var url = urlBuilders[host](word);
+        var url = helpers.urlBuilders[host](word);
         request(encodeURI(url), function (error, response, body) {
             var root;
-            try {
-                root = siteParsers[host](body);
-                if (body.indexOf('Нет такой страницы') > 0 || root === '')
-                    root = natural.PorterStemmer.stem(word);
-            } catch (e) {
-                root = natural.PorterStemmer.stem(word);
+            root = helpers.siteParsers[host](body);
+            if (body.indexOf('Нет такой страницы') > 0 || root === '') {
+                root = stemmedWord;
             }
-            ROOTS_CACHE.set(natural.PorterStemmer.stem(word), root);
-            if (roots.has(root)) {
-                roots.get(root).push(word);
-            } else {
-                roots.set(root, [word]);
-            }
+            ROOTS_CACHE.set(stemmedWord, root);
+            updateRoots(roots, root, word);
             resolve();
         });
     });
 }
 
 function getWordRoot(word, host) {
-    host = host || MORPHEME_ONLINE;
-    var url = urlBuilders[host](word);
+    host = host || helpers.MORPHEME_ONLINE;
+    var url = helpers.urlBuilders[host](word);
     var res = syncRequest('GET', encodeURI(url));
-    try {
-        var root = siteParsers[host](res.getBody());
-        if (root === '')
-            root = natural.PorterStemmer.stem(word);
-        ROOTS_CACHE.set(word, root);
-        return root;
-    } catch (e) {
-        return word;
+    if (res.statusCode === 404) {
+        return natural.PorterStemmer.stem(word);
     }
+    var root = helpers.siteParsers[host](res.getBody());
+
+    if (root === '') {
+        root = natural.PorterStemmer.stem(word);
+    }
+    ROOTS_CACHE.set(word, root);
+    return root;
 }
 
-getWordsFromText = text =>
-    text
+function getWordsFromText(text) {
+    return text
         .split(/[^а-яё]/)
         .filter(item => item !== '')
         .filter(item => !BLACKLIST.has(item));
+}
 
-getMostOccurringElement = array => _
-    .chain(array)
-    .groupBy()
-    .orderBy('length', 'desc')
-    .map(arr => [arr[0], arr.length])
-    .value();
-
-count = word =>
-    _.chain(getWordsByRoot().get(getWordRoot(word)))
+function getMostOccurringElement(array) {
+    return _
+        .chain(array)
+        .groupBy()
+        .orderBy('length', 'desc')
+        .map(arr => [arr[0], arr.length])
+        .value();
+}
+function count(word) {
+    return _
+        .chain(getWordsByRoot().get(getWordRoot(word)))
         .countBy(curWord => curWord === word)
         .value()['true'];
-
-top = n =>
+}
+function top(n) {
     _
         .chain(list(getWordsByRoot().values()))
         .orderBy('[1].length', 'desc')
         .take(n)
         .map(pair => [pair[1][0], pair[1].length])
         .value();
-
-countAsync = (word, cb) => {
+}
+function countAsync(word, cb) {
     var roots = new Map();
-    var root = getWordRoot(word, VNUTRI_SLOVA);
+    var root = getWordRoot(word, helpers.VNUTRI_SLOVA);
     fillWordsByRootAsync(roots).then(() => {
         var ans = roots.get(root) || 0;
-        cb(ans);
+        cb(ans.length);
         console.log(new Date());
     });
-};
+}
 
-topAsync = (n, cb) => {
+function topAsync(n, cb) {
     var roots = new Map();
     fillWordsByRootAsync(roots).then(() => {
         cb(_
@@ -168,11 +155,10 @@ topAsync = (n, cb) => {
             .orderBy('[1].length', 'desc')
             .take(n)
             .map(pair => pair[1][0] + ": " + pair[1].length)
-            .value()
-        );
+            .value());
         console.log(new Date());
     })
-};
+}
 module.exports.top = topAsync;
 module.exports.count = countAsync;
 
@@ -189,10 +175,12 @@ function list(iterator) {
 }
 
 const TASK_COUNT = 1; // с 10 долго :(
-
 console.log(new Date());
-topAsync(10, data => data.forEach(d => console.log(d)));
-//countAsync("kek", ans => console.log(ans));
+var callbackForTopAsync = data => data.forEach(d => console.log(d));
+var callbackForCountAsync = ans => console.log(ans);
+topAsync(10, callbackForTopAsync);
+//countAsync("kek", callbackForCountAsync);
 //countAsync("пользователь", ans => console.log(ans));
-//countAsync("скрипт");
-//countAsync("задание");
+
+//countAsync("скрипт", callbackForCountAsync);
+//countAsync("задание", callbackForCountAsync);
