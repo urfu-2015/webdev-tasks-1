@@ -1,27 +1,83 @@
 const request = require('request');
 const fs = require('fs');
 const async = require('async');
+const url_git = 'https://api.github.com/orgs/urfu-2015/repos?access_token=';
+const url_roots = 'http://vnutrislova.net/';
+const fileKey = 'key.txt';
 var reRoot = /корень \[([а-я]*)]/i;
+var fileWords = 'stopWords.txt';
+var fileStat = 'statistic.txt';
 
 var result = {};
 var roots = [];
 
-function getData(req_arg, req) {
+function getRoots(words, stopWords, callback) {
+    async.waterfall([
+        function get_roots(next) {
+            async.each(words, function (word, callback) {
+                if (stopWords.indexOf(word) === -1) {
+                    var check = hasWord(word);
+                    if (check) {
+                        result[check].push(word);
+                    } else {
+                        request({
+                                url: url_roots + encodeURI('разбор/по-составу/') + encodeURI(word),
+                                method: 'GET'
+                            },
+                            function (err, res, body) {
+                                var root;
+                                if (!err && res.statusCode === 200) {
+                                    root = body.match(reRoot);
+                                    if (root && root[1] !== undefined) {
+                                        if (roots.indexOf(root[1]) === -1) {
+                                            roots.push(root[1]);
+                                            result[root[1]] = [];
+                                        }
+                                        result[root[1]].push(word);
+                                    }
+                                }
+                                callback();
+                            })
+                    }
+                } else {
+                    callback();
+                }
+            }, function (err) {
+                next(null);
+            })
+        },
+        function write_roots(next) {
+            fs.writeFile(fileStat, JSON.stringify(result), function (err) {
+                callback(null);
+            })
+        }
+    ]);
+}
 
+function hasWord(word) {
+    for (var root in result) {
+        if (result[root].indexOf(word) !== -1) {
+            return root;
+        }
+    }
+    return false;
+}
+
+function getData(req_arg, req) {
     async.waterfall([
         function getKey(callback) {
-            fs.readFile('key.txt', 'utf-8', function(err, data) {
+            fs.readFile(fileKey, 'utf-8', function(err, data) {
                 callback(null, data);
             });
         },
+
         function getRepos(key, callback) {
             request({
-                    url: 'https://api.github.com/orgs/urfu-2015/repos?access_token=' + key,
+                    url: url_git + key,
                     method: 'GET',
                     headers: {'user-agent': 'mdf-app'}
                 },
                 function (err, res, body) {
-                    console.log(res.statusCode);
                     if (!err && res.statusCode === 200) {
                         var repos = JSON.parse(body);
                         var tasks = [];
@@ -35,9 +91,9 @@ function getData(req_arg, req) {
                 }
             )
         },
+
         function getWords(repos, callback) {
             var all_words = [];
-            console.log(repos.length);
             async.eachSeries(repos, function (repo, callback) {
                 request({
                         url: repo.contents_url.replace(/\{\+(\w)*}/, 'README.md'),
@@ -45,23 +101,31 @@ function getData(req_arg, req) {
                         headers: {'user-agent': 'mdf-app'}
                     },
                     function (err, res, body) {
-                        console.log(res.statusCode);
-                        request({
-                                url: JSON.parse(body).download_url,
-                                method: 'GET',
-                                headers: {'user-agent': 'mdf-app'}
-                            },
-                            function (err, res, body) {
-                                if (!err && res.statusCode === 200) {
-                                    var words = body.replace(/[^А-Яа-я ]/g, ' ').replace(/\s+/g, ' ')
-                                        .replace(/^\s|\s$/g, '').toLowerCase().split(' ');
-                                    words.forEach(function (word) {
-                                        all_words.push(word);
-                                    });
+                        var ok = true;
+                        try {
+                            var url = JSON.parse(body);
+                        } catch(err) {
+                            ok = false;
+                        }
+                        if (ok) {
+                            request({
+                                    url: url.download_url,
+                                    method: 'GET',
+                                    headers: {'user-agent': 'mdf-app'}
+                                },
+                                function (err, res, body) {
+                                    if (!err && res.statusCode === 200) {
+                                        var words = body.replace(/[^А-Яа-я ]/g, ' ').replace(/\s+/g, ' ')
+                                            .replace(/^\s|\s$/g, '').toLowerCase().split(' ');
+
+                                        words.forEach(function (word) {
+                                            all_words.push(word);
+                                        });
+                                    }
+                                    callback();
                                 }
-                                callback();
-                            }
-                        );
+                            );
+                        }
                     }
                 );
             }, function (err, all_words) {
@@ -69,10 +133,36 @@ function getData(req_arg, req) {
             });
         },
 
-        function getRoots(all_words, callback) {
-            async.eachSeries(all_words, function (word, callback) {
+        function getStopWords(all_words, callback) {
+            fs.readFile(fileWords, 'utf-8', function (err, data) {
+                callback(null, all_words, data.split('\r\n'));
+            });
+        },
+
+        function getStat(all_words, stopWords, callback) {
+            fs.readFile(fileStat, 'utf-8', function (err, data) {
+                if (err) {
+                    getRoots(all_words, stopWords, callback);
+                } else {
+                    try {
+                        result = JSON.parse(data);
+                    } catch(err) {
+                        throw err;
+                    }
+                    callback(null);
+                }
+            });
+        },
+
+        function fin(callback) {
+            if (req === 'count') {
+                var check = hasWord(req_arg);
+                if (check) {
+                    console.log(req_arg, result[check].length);
+                    callback(null);
+                } else {
                     request({
-                            url: 'http://vnutrislova.net/' + encodeURI('разбор/по-составу/') + encodeURI(word),
+                            url: url_roots + encodeURI('разбор/по-составу/') + encodeURI(req_arg),
                             method: 'GET'
                         },
                         function (err, res, body) {
@@ -80,41 +170,12 @@ function getData(req_arg, req) {
                             if (!err && res.statusCode === 200) {
                                 root = body.match(reRoot);
                                 if (root && root[1] !== undefined) {
-                                    if (roots.indexOf(root[1]) === -1) {
-                                        roots.push(root[1]);
-                                        result[root[1]] = [];
-                                    }
-                                    result[root[1]].push(word);
-
+                                    console.log(req_arg, result[root[1]].length);
                                 }
                             }
-                            callback();
-                        }
-                    )
-                },
-                function (err) {
-                    callback(null);
+                            callback(null);
+                        })
                 }
-            )
-        },
-        function fin(callback) {
-            if (req === 'count') {
-                request({
-                        url: 'http://vnutrislova.net/' + encodeURI('разбор/по-составу/') + encodeURI(req_arg),
-                        method: 'GET'
-                    },
-
-                    function (err, res, body) {
-                        var root;
-                        if (!err && res.statusCode === 200) {
-                            root = body.match(reRoot);
-                            if (root && root[1] !== undefined) {
-                                console.log(req_arg, result[root[1]].length);
-                            }
-                        }
-                        callback(null);
-                    }
-                )
             } else if (req === 'top') {
                 var sort_mas = [];
                 for (var root in result) {
@@ -129,15 +190,16 @@ function getData(req_arg, req) {
                     console.log(result[sort_mas[i][0]][0], sort_mas[i][1]);
                     i += 1;
                 }
+                callback(null);
             }
         }
     ]);
 }
 
-module.exports.count = function (word) {
+exports.count = function (word) {
     getData(word, 'count');
 };
 
-module.exports.top = function (count) {
+exports.top = function (count) {
     getData(count, 'top');
 };
