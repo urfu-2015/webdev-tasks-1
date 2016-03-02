@@ -57,11 +57,6 @@ function fillWordsByRootAsync(roots, tasksCount) {
     var tasks = downloadTaskReadmes(tasksCount);
     var words = getWordsFromText(tasks);
     console.log("Total words count: " + words.length);
-    //var promises = linq
-    //    .from(words)
-    //    .select((w, i) => fillRootsAsync(w, roots, i))
-    //    .toArray();
-    //return Promise.all(promises);
     return Promise.all(words.map(w => fillRootsAsync(w, roots)));
 }
 
@@ -83,11 +78,11 @@ siteParsers[VNUTRI_SLOVA] = body => {
     return root;
 };
 
-//function fillRootsAsync(word, roots, host) {
 function fillRootsAsync(word, roots, host) {
     return new Promise(resolve => {
         host = host || VNUTRI_SLOVA;
         if (ROOTS_CACHE.has(natural.PorterStemmer.stem(word))) {
+            resolve();
             return ROOTS_CACHE.get(natural.PorterStemmer.stem(word));
         }
         var url = urlBuilders[host](word);
@@ -153,27 +148,25 @@ top = n =>
         .select(pair => [pair[1][0], pair[1].length])
         .toArray();
 
-countAsync = word => {
+countAsync = (word, cb) => {
     var roots = new Map();
     var root = getWordRoot(word, VNUTRI_SLOVA);
     fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
-        console.log(roots);
-        console.log(roots.get(root).length);
+        cb(roots.get(root).length);
         console.log(new Date());
     });
 };
 
-topAsync = n => {
+topAsync = (n, cb) => {
     var roots = new Map();
     fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
-        linq
+        cb(linq
             .from(list(roots.entries()))
             .orderByDescending(pair => pair[1].length)
             .take(n)
-            .select(pair => [pair[1][0], pair[1].length])
-            //.select(pair => getMostOccurringElement(pair[1]))
+            .select(pair => pair[0] + ": " + pair[1].length)
             .toArray()
-            .forEach(pair => console.log(pair[0] + ": " + pair[1]));
+        );
         console.log(new Date());
     })
 };
@@ -192,10 +185,10 @@ function list(iterator) {
     return res;
 }
 
-const TASK_COUNT = 1;
+const TASK_COUNT = 1; // с 10 долго :(
 
 console.log(new Date());
-//topAsync(10);
-//countAsync("пользователь");
-countAsync("скрипт");
+//topAsync(10, data => data.forEach(d => console.log(d)));
+countAsync("пользователь", ans => console.log(ans));
+//countAsync("скрипт");
 //countAsync("задание");
