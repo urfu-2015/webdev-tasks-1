@@ -3,12 +3,33 @@
 var taskList = [];
 const https = require('https');
 const badWords = require('./badWords.js');
+const Duplex = require('stream').Duplex;
+var textStream = new Duplex({
+    write: function (chunk, encoding, next) {
+        if (chunk) {
+            chunk = new Buffer(chunk.content, 'base64').toString('utf-8');
+        }
+        this.push(chunk);
+    },
+    read: function (number) {
+    }
+}).setEncoding('utf8');
+
+textStream.on('data', function (data) {
+    var taskWordFreq = new WordFrequency(data);
+    overallWordFreq = overallWordFreq.join(taskWordFreq);
+});
+
+textStream.on('end', function (data) {
+    taskList.forEach(func => {
+        func();
+    });
+});
 
 var httpClient = {
     requestsSent: 0,
     responsesReceived: 0,
-    sendHttpReq: function (path, callback) {
-        var json;
+    sendHttpReq: function (path, stream, callback) {
         var options = {
             hostname: 'api.github.com',
             port: 443,
@@ -24,11 +45,13 @@ var httpClient = {
         var req = https.request(options, (res) => {
             res.setEncoding('utf8');
             var data = '';
+
             res.on('data', (d) => {
                 data += d;
             });
 
             res.on('end', () => {
+                this.responsesReceived++;
                 var response = JSON.parse(data);
                 if (res.statusCode !== 200) {
                     console.log('Ошибка: HTTP ' + res.statusCode);
@@ -36,8 +59,11 @@ var httpClient = {
                     console.log(response.documentation_url);
                     return;
                 }
-                this.responsesReceived++;
-                callback(response);
+                stream ? stream._write(response) : null;
+                callback ? callback(response) : null;
+                if (this.requestsSent === this.responsesReceived && stream) {
+                    stream._write(null);
+                }
             });
         });
         req.end();
@@ -168,22 +194,13 @@ var getTasks = function (response) {
             task.name.indexOf('javascript-tasks-') !== -1
         ) {
             var readmePath = '/repos/urfu-2015/' + task.name + '/contents/README.md?ref=master';
-            httpClient.sendHttpReq(readmePath, function (response) {
-                var taskText = (new Buffer(response.content, 'base64')).toString('utf-8');
-                var taskWordFreq = new WordFrequency(taskText);
-                overallWordFreq = overallWordFreq.join(taskWordFreq);
-                if (httpClient.areResponsesReceived) {
-                    taskList.forEach(func => {
-                        func();
-                    });
-                }
-            });
+            httpClient.sendHttpReq(readmePath, textStream);
         }
     });
 };
 
 var overallWordFreq = new WordFrequency();
-httpClient.sendHttpReq('/orgs/urfu-2015/repos', getTasks);
+httpClient.sendHttpReq('/orgs/urfu-2015/repos', null, getTasks);
 
 module.exports.count = function (word) {
     if (httpClient.areResponsesReceived) {
