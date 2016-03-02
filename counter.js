@@ -92,7 +92,7 @@ function fillRootsAsync(word, roots, host) {
             var root;
             try {
                 root = siteParsers[host](body);
-                if (body.indexOf('Нет такой страницы') > 0 || root == '')
+                if (body.indexOf('Нет такой страницы') > 0 || root === '')
                     root = natural.PorterStemmer.stem(word);
             } catch (e) {
                 root = natural.PorterStemmer.stem(word);
@@ -114,7 +114,7 @@ function getWordRoot(word, host) {
     var res = syncRequest('GET', encodeURI(url));
     try {
         var root = siteParsers[host](res.getBody());
-        if (root == '')
+        if (root === '')
             root = natural.PorterStemmer.stem(word);
         ROOTS_CACHE.set(word, root);
         return root;
@@ -125,8 +125,8 @@ function getWordRoot(word, host) {
 
 getWordsFromText = text =>
     text
-        .split(/[ A-Za-z!`–.│@$©&”#“№«\\»{}?|,—+-_\*1234567890'"\[\]<>\(\)\n\r]/)
-        .filter(item => item != '')
+        .split(/[^а-яё]/)
+        .filter(item => item !== '')
         .filter(item => !BLACKLIST.has(item));
 
 getMostOccurringElement = array =>
@@ -140,7 +140,7 @@ getMostOccurringElement = array =>
 count = word =>
     linq
         .from(getWordsByRoot(TASK_COUNT).get(getWordRoot(word)))
-        .count(curWord => curWord == word);
+        .count(curWord => curWord === word);
 
 top = n =>
     linq
