@@ -3,7 +3,8 @@ const http = require('http');
 const syncRequest = require("sync-request");
 const request = require("request");
 const cheerio = require("cheerio");
-const linq = require('linq');
+const _ = require('lodash');
+
 const natural = require('natural');
 
 const GITHUB = 'https://api.github.com';
@@ -56,7 +57,7 @@ function getWordsByRoot() {
 }
 
 function fillWordsByRootAsync(roots) {
-    var tasks = downloadTaskReadmes(TASK_COUNT);
+    var tasks = downloadTaskReadmes();
     var words = getWordsFromText(tasks);
     console.log("Total words count: " + words.length);
     return Promise.all(words.map(w => fillRootsAsync(w, roots)));
@@ -129,31 +130,30 @@ getWordsFromText = text =>
         .filter(item => item !== '')
         .filter(item => !BLACKLIST.has(item));
 
-getMostOccurringElement = array =>
-    linq
-        .from(array)
-        .groupBy(w => w)
-        .orderByDescending(g => g.count())
-        .select(g => [g.key(), g.count()])
-        .first();
+getMostOccurringElement = array => _
+    .chain(array)
+    .groupBy()
+    .orderBy('length', 'desc')
+    .map(arr => [arr[0], arr.length])
+    .value();
 
 count = word =>
-    linq
-        .from(getWordsByRoot(TASK_COUNT).get(getWordRoot(word)))
-        .count(curWord => curWord === word);
+    _.chain(getWordsByRoot().get(getWordRoot(word)))
+        .countBy(curWord => curWord === word)
+        .value()['true'];
 
 top = n =>
-    linq
-        .from(list(getWordsByRoot(TASK_COUNT).values()))
-        .orderByDescending(pair => pair[1].length)
+    _
+        .chain(list(getWordsByRoot().values()))
+        .orderBy('[1].length', 'desc')
         .take(n)
-        .select(pair => [pair[1][0], pair[1].length])
-        .toArray();
+        .map(pair => [pair[1][0], pair[1].length])
+        .value();
 
 countAsync = (word, cb) => {
     var roots = new Map();
     var root = getWordRoot(word, VNUTRI_SLOVA);
-    fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
+    fillWordsByRootAsync(roots).then(() => {
         var ans = roots.get(root) || 0;
         cb(ans);
         console.log(new Date());
@@ -162,13 +162,13 @@ countAsync = (word, cb) => {
 
 topAsync = (n, cb) => {
     var roots = new Map();
-    fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
-        cb(linq
-            .from(list(roots.entries()))
-            .orderByDescending(pair => pair[1].length)
+    fillWordsByRootAsync(roots).then(() => {
+        cb(_
+            .chain(list(roots.entries()))
+            .orderBy('[1].length', 'desc')
             .take(n)
-            .select(pair => pair[0] + ": " + pair[1].length)
-            .toArray()
+            .map(pair => pair[1][0] + ": " + pair[1].length)
+            .value()
         );
         console.log(new Date());
     })
@@ -191,8 +191,14 @@ function list(iterator) {
 const TASK_COUNT = 1; // с 10 долго :(
 
 console.log(new Date());
-//topAsync(10, data => data.forEach(d => console.log(d)));
-countAsync("kek", ans => console.log(ans));
+topAsync(10, data => data.forEach(d => console.log(d)));
+//countAsync("kek", ans => console.log(ans));
 //countAsync("пользователь", ans => console.log(ans));
 //countAsync("скрипт");
 //countAsync("задание");
+
+//console.log(_
+//    .chain([[1, [1, 2, 3]], [2, [2, 3, 4]], [3, [3, 4]], [1, []], [2, [1, 2]], [1, [1, 2, 3, 4]]])
+//    .orderBy('[1].length', 'desc')
+//    .value()
+//);
