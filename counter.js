@@ -3,7 +3,7 @@ const syncRequest = require("sync-request");
 const request = require("request");
 const _ = require('lodash');
 const natural = require('natural');
-const urlLib = require('url');
+const url = require('url');
 const helpers = require('./helpers');
 
 const GITHUB = 'api.github.com';
@@ -24,18 +24,18 @@ function downloadTaskReadmes() {
 }
 
 function getReadme(courseType, taskIndex) {
-    var url = urlLib.format({
+    var readmeUrl = url.format({
         protocol: 'https:',
         host: GITHUB,
         pathname: '/repos/urfu-2015/' + courseType + taskIndex + '/readme',
-        search: '?access_token=' + KEY
+        query: {'?access_token': KEY}
     });
     var options = {
         headers: {
             'User-Agent': 'request'
         }
     };
-    var res = syncRequest('GET', encodeURI(url), options);
+    var res = syncRequest('GET', encodeURI(readmeUrl), options);
     var json = JSON.parse(res.getBody());
     return Buffer(json['content'], json['encoding'])
         .toString('utf-8')
@@ -78,8 +78,8 @@ function fillRootsAsync(word, roots, host) {
             resolve();
             return;
         }
-        var url = helpers.urlBuilders[host](word);
-        request(encodeURI(url), function (error, response, body) {
+        var rootRequestUrl = helpers.urlBuilders[host](word);
+        request(encodeURI(rootRequestUrl), function (error, response, body) {
             var root;
             root = helpers.siteParsers[host](body);
             if (body.indexOf('Нет такой страницы') > 0 || root === '') {
@@ -94,8 +94,8 @@ function fillRootsAsync(word, roots, host) {
 
 function getWordRoot(word, host) {
     host = host || helpers.MORPHEME_ONLINE;
-    var url = helpers.urlBuilders[host](word);
-    var res = syncRequest('GET', encodeURI(url));
+    var rootRequestUrl = helpers.urlBuilders[host](word);
+    var res = syncRequest('GET', encodeURI(rootRequestUrl));
     if (res.statusCode === 404) {
         return natural.PorterStemmer.stem(word);
     }
