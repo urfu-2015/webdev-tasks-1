@@ -13,13 +13,13 @@ const VNUTRI_SLOVA = 'http://vnutrislova.net/разбор/по-составу/';
 const BLACKLIST = new Set(JSON.parse(fs.readFileSync('blacklist.json')));
 const ROOTS_CACHE = new Map();
 
-function downloadTaskReadmes(taskCount) {
+function downloadTaskReadmes() {
     const JS_TASKS = 'javascript-tasks-';
     const VERSTKA_TASKS = 'verstka-tasks-';
     var tasks = "";
-    for (var i = 1; i <= taskCount; i++) {
-        tasks += ' ' + getReadme(JS_TASKS, i).toLocaleLowerCase();
-        tasks += ' ' + getReadme(VERSTKA_TASKS, i).toLocaleLowerCase();
+    for (var i = 1; i <= TASK_COUNT; i++) {
+        tasks += ' ' + getReadme(JS_TASKS, i);
+        tasks += ' ' + getReadme(VERSTKA_TASKS, i);
     }
     return tasks;
 }
@@ -34,10 +34,12 @@ function getReadme(courseType, taskIndex) {
     };
     var res = syncRequest('GET', encodeURI(url), options);
     var json = JSON.parse(res.getBody());
-    return Buffer(json['content'], json['encoding']).toString('utf-8');
+    return Buffer(json['content'], json['encoding'])
+        .toString('utf-8')
+        .toLocaleLowerCase();
 }
-function getWordsByRoot(taskCount) {
-    var tasks = downloadTaskReadmes(taskCount);
+function getWordsByRoot() {
+    var tasks = downloadTaskReadmes();
     var roots = new Map();
     tasks.forEach(taskText => {
         var words = getWordsFromText(taskText);
@@ -53,8 +55,8 @@ function getWordsByRoot(taskCount) {
     return roots;
 }
 
-function fillWordsByRootAsync(roots, tasksCount) {
-    var tasks = downloadTaskReadmes(tasksCount);
+function fillWordsByRootAsync(roots) {
+    var tasks = downloadTaskReadmes(TASK_COUNT);
     var words = getWordsFromText(tasks);
     console.log("Total words count: " + words.length);
     return Promise.all(words.map(w => fillRootsAsync(w, roots)));
