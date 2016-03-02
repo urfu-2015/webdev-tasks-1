@@ -196,9 +196,3 @@ topAsync(10, data => data.forEach(d => console.log(d)));
 //countAsync("пользователь", ans => console.log(ans));
 //countAsync("скрипт");
 //countAsync("задание");
-
-//console.log(_
-//    .chain([[1, [1, 2, 3]], [2, [2, 3, 4]], [3, [3, 4]], [1, []], [2, [1, 2]], [1, [1, 2, 3, 4]]])
-//    .orderBy('[1].length', 'desc')
-//    .value()
-//);
