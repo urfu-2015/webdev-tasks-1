@@ -40,11 +40,13 @@ function getStatistics(req, type) {
          * @param wordsRoots
          */
         function (err, countRepetitions, wordsRoots) {
+            if (err) {
+                console.error(err);
+            }
             if (type === 'top') {
                 showTop(req, countRepetitions);
             } else {
                 showCount(req, countRepetitions, wordsRoots);
-
             }
         });
 }
@@ -67,6 +69,8 @@ function getRepos(callback) {
                 callback(err, reposList.map(function (repos) {
                     return repos.full_name;
                 }));
+            } else {
+                callback(err);
             }
         }
     );
@@ -84,24 +88,40 @@ function getAllReadme(reposList, callback) {
         return repos.indexOf('tasks') !== -1;
     });
 
-    async.forEach(reposList, function (repos, next) {
-        request({
-                url: GITHUB_API + '/repos/' + repos + '/readme?access_token=' + OATH_TOKEN,
-                method: 'GET',
-                headers: {'User-Agent': 'Webdev homework 1.0.0'}
-            },
-            function (err, res, body) {
-                if (!err && res.statusCode === 200) {
-                    var parsedBody = JSON.parse(body);
-                    reposContent += ' ' + (new Buffer(parsedBody.content, parsedBody.encoding)
-                        .toString('utf-8'));
-                    next();
+    var promisifiedReposContent = reposList.map(function (repos) {
+        return new Promise(function (resolve, rejected) {
+            var promiseCallback = function (error) {
+                if (error) {
+                    rejected(error);
+                } else {
+                    resolve();
                 }
-            }
-        );
-    }, function (err) {
-        callback(null, reposContent);
+            };
+
+            request({
+                    url: GITHUB_API + '/repos/' + repos + '/readme?access_token=' + OATH_TOKEN,
+                    method: 'GET',
+                    headers: {'User-Agent': 'Webdev homework 1.0.0'}
+                },
+                function (err, res, body) {
+                    if (!err && res.statusCode === 200) {
+                        var parsedBody = JSON.parse(body);
+                        reposContent += ' ' + (new Buffer(parsedBody.content, parsedBody.encoding)
+                                .toString('utf-8'));
+                    }
+                    promiseCallback(err);
+                }
+            );
+        });
     });
+
+    Promise.all(promisifiedReposContent)
+        .then(function () {
+            callback(null, reposContent);
+        })
+        .catch(function (err) {
+            callback(err);
+        });
 }
 
 /**
@@ -133,38 +153,54 @@ function countStatistics(reposContent, callback) {
      Его выведем в статистику
      */
     var countRepetitions = {};
-    async.eachSeries(reposContent, function (word, next) {
-        request({
-                url: PARSE_WORD_SERVICE + encodeURI(word),
-                method: 'GET'
-            },
-            function (err, res, body) {
-                var rootIndex = -1;
-                var currentRoot = word;
-                if (!err && res.statusCode === 200) {
-                    body = body.split(' ');
-                    rootIndex = body.indexOf('корень');
-                    if (rootIndex !== -1) {
-                        currentRoot = body[rootIndex + 1].replace(REGEXP, '');
-                    }
+    const wordParts = 'Возможный состав слова: ';
+    const endSubstrWithRoot = 'альтернативные варианты';
+
+    var promisifiedWords = reposContent.map(function (currentWord) {
+        return new Promise(function (resolve, rejected) {
+            var promiseCallback = function (error) {
+                if (error) {
+                    rejected(error);
+                } else {
+                    resolve();
                 }
-                if (wordsRoots[word] === undefined) {
+            };
+
+            request({
+                    url: PARSE_WORD_SERVICE + encodeURI(currentWord),
+                    method: 'GET'
+                },
+                function (err, res, body) {
+                    var rootIndex = -1;
+                    var currentRoot = currentWord;
+                    if (!err && res.statusCode === 200) {
+                        var substrWithRoot = body.slice(body.indexOf(wordParts),
+                            body.indexOf(endSubstrWithRoot)).split(' ');
+                        rootIndex = substrWithRoot.indexOf('корень');
+                        if (rootIndex !== -1) {
+                            currentRoot = substrWithRoot[rootIndex + 1].replace(REGEXP, '');
+                        }
+                    }
+                    if (wordsRoots[currentWord] === undefined) {
+                        wordsRoots[currentWord] = currentRoot;
+                    }
                     if (countRepetitions[currentRoot] === undefined) {
-                        countRepetitions[currentRoot] =
-                        {root: currentRoot, count: 0, word: word};
+                        countRepetitions[currentRoot] = {root: currentRoot,
+                                count: 0, word: currentWord};
                     }
-                    wordsRoots[word] = currentRoot;
-                }
-                countRepetitions[currentRoot].count += 1;
-                next();
-            });
-    }, function (err) {
-        if (err) {
-            callback(err);
-        } else {
-            callback(null, countRepetitions, wordsRoots);
-        }
+                    countRepetitions[currentRoot].count += 1;
+                    promiseCallback(err);
+                });
+        });
     });
+
+    Promise.all(promisifiedWords)
+        .then(function () {
+            callback(null, countRepetitions, wordsRoots);
+        })
+        .catch(function (err) {
+            callback(err);
+        });
 }
 
 /**
@@ -174,7 +210,7 @@ function countStatistics(reposContent, callback) {
  * @param b
  * @returns {number}
  */
-function compare(a, b) {
+function compareRepetitions(a, b) {
     if (a.count > b.count) {
         return -1;
     }
@@ -194,10 +230,10 @@ function showTop(count, countRepetitions) {
     for (var el in countRepetitions) {
         sortedCount.push(countRepetitions[el]);
     }
-    sortedCount.sort(compare);
+    sortedCount.sort(compareRepetitions);
     count = count > sortedCount.length ? sortedCount.length : count;
     //var writer = fs.
-    //    createWriteStream('Statistics.txt')
+    //    createWriteStream('Stat.txt')
     //    .on('finish', function() {
     //        console.log('Success');
     //    });
@@ -217,8 +253,8 @@ function showTop(count, countRepetitions) {
  */
 function showCount(word, countRepetitions, wordsRoots) {
     if (wordsRoots[word] === undefined) {
-        process.stdout.write(0);
+        process.stdout.write(word + ' ' + '0\n');
     } else {
-        process.stdout.write(countRepetitions[wordsRoots[word]].count);
+        process.stdout.write(word + ' ' + countRepetitions[wordsRoots[word]].count.toString());
     }
 }
