@@ -10,7 +10,7 @@ const deferredAction = [];
 const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
 const GIT_URL = 'api.github.com';
 
-let promise = new Promise(function (resolve, reject) {
+let promise = new Promise((resolve, reject) => {
     let address = url.format({
         protocol: 'https',
         host: GIT_URL,
@@ -23,7 +23,7 @@ let promise = new Promise(function (resolve, reject) {
             'User-Agent': 'request'
         }
     };
-    request(options, function (error, response, body) {
+    request(options, (error, response, body) => {
         if (error || response.statusCode !== 200) {
             reject(error ? error : 'statusCode is not 200');
         }
@@ -37,7 +37,7 @@ let promise = new Promise(function (resolve, reject) {
         }
         let calls = 0;
         for (let i = 0; i < names.length; i++) {
-            processingREADME(names[i], function (error) {
+            processingREADME(names[i], (error) => {
                 if (error) {
                     reject(error);
                 }
@@ -62,7 +62,7 @@ function processingREADME(name, callback) {
             'User-Agent': 'request'
         }
     };
-    request(options, function (error, response, body) {
+    request(options, (error, response, body) => {
         if (!error && response.statusCode === 200) {
             processingText(JSON.parse(body).content);
             callback(null);
@@ -81,7 +81,7 @@ function processingText(encodedText) {
     let tokenizer = new natural.AggressiveTokenizerRu();
     let cleanText = [];
     decodeText = tokenizer.tokenize(decodeText);
-    decodeText.forEach(function (word) {
+    decodeText.forEach((word) => {
         if (stopWords.indexOf(word) === -1) {
             cleanText.push(word);
         }
@@ -114,16 +114,14 @@ function addToFrequencyArray(wordArray) {
     }
 }
 
-exports.top = function (n) {
+exports.top = (n) => {
     if (data_analyzed) {
-        return new Promise(function (resolve, reject) {
+        return new Promise((resolve, reject) => {
             resolve(hiddenTop(n));
         });
     }
     deferredAction.push(function (i) {
-        return function () {
-            return hiddenTop(i);
-        };
+        return () => hiddenTop(i);
     }(n));
     return promise.then(
         result => {
@@ -137,16 +135,14 @@ exports.top = function (n) {
     );
 };
 
-exports.count = function (word) {
+exports.count = (word) => {
     if (data_analyzed) {
-        return new Promise(function (resolve, reject) {
+        return new Promise((resolve, reject) => {
             resolve(hiddenCount(word));
         });
     }
     deferredAction.push(function (i) {
-        return function () {
-            return hiddenCount(i);
-        };
+        return () => hiddenCount(i);
     }(word));
     return promise.then(
         result => {
@@ -161,8 +157,7 @@ exports.count = function (word) {
 };
 
 function hiddenTop(n) {
-    frequencyDict.sort(compare);
-    frequencyDict.reverse();
+    frequencyDict.sort(compare).reverse();
     let result = [];
     for (let i = 0; i < Math.min(n, frequencyDict.length); i++) {
         result.push(frequencyDict[i].fullWords[0] + ' ' + frequencyDict[i].count);
