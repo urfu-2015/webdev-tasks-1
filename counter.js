@@ -152,7 +152,8 @@ countAsync = (word, cb) => {
     var roots = new Map();
     var root = getWordRoot(word, VNUTRI_SLOVA);
     fillWordsByRootAsync(roots, TASK_COUNT).then(() => {
-        cb(roots.get(root).length);
+        var ans = roots.get(root) || 0;
+        cb(ans);
         console.log(new Date());
     });
 };
@@ -189,6 +190,7 @@ const TASK_COUNT = 1; // с 10 долго :(
 
 console.log(new Date());
 //topAsync(10, data => data.forEach(d => console.log(d)));
-countAsync("пользователь", ans => console.log(ans));
+countAsync("kek", ans => console.log(ans));
+//countAsync("пользователь", ans => console.log(ans));
 //countAsync("скрипт");
 //countAsync("задание");
