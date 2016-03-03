@@ -37,14 +37,12 @@ let promise = rp(options).then(
 
 function promisesFromBody(body) {
     let repos = JSON.parse(body);
-    let promises = [];
-    for (let i = 0; i < repos.length; i++) {
-        let reposName = repos[i].name;
-        if (isAppropriateRepos(reposName)) {
-            promises.push(processingREADME(reposName));
+    return repos.reduce((promises, rep) => {
+        if (isAppropriateRepos(rep.name)) {
+            promises.push(processingREADME(rep.name));
         }
-    }
-    return promises;
+        return promises;
+    }, []);
 }
 
 function handleError(error) {
@@ -78,21 +76,20 @@ function urlForReadme(reposName) {
 }
 
 function processingText(encodedTexts) {
-    let decodeText = '';
-    for (let i = 0; i<encodedTexts.length; i++) {
-        decodeText += new Buffer(encodedTexts[i], 'base64').toString();
-    }
+    let decodeText = encodedTexts.reduce((decodeText, text) => {
+        return decodeText += new Buffer(text, 'base64').toString();
+    }, '');
     decodeText = decodeText
         .replace(/[^ЁёА-я \n]/g, '')
         .replace(/\s+/g, ' ')
         .toLowerCase()
         .split(' ');
-    let cleanText = [];
-    decodeText.forEach((word) => {
+    let cleanText = decodeText.reduce((cleanText, word) => {
         if (stopWords.indexOf(word) === -1) {
             cleanText.push(word);
         }
-    });
+        return cleanText;
+    }, [])
     addToFrequencyArray(cleanText);
 }
 
