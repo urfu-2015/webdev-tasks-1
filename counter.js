@@ -5,82 +5,89 @@ const natural = require('natural');
 const url = require('url');
 const OAUTH_TOKEN = fs.readFileSync('./key.txt', 'utf-8');
 const frequencyDict = [];
-let data_analyzed = false;
 const deferredAction = [];
 const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
 const GIT_URL = 'api.github.com';
 
+let address = url.format({
+    protocol: 'https',
+    host: GIT_URL,
+    pathname: '/orgs/urfu-2015/repos',
+    search: '?access_token=' + OAUTH_TOKEN,
+});
+let options = {
+    url: address,
+    headers: {
+        'User-Agent': 'request'
+    }
+};
+
 let promise = new Promise((resolve, reject) => {
-    let address = url.format({
-        protocol: 'https',
-        host: GIT_URL,
-        pathname: '/orgs/urfu-2015/repos',
-        search: '?access_token=' + OAUTH_TOKEN,
-    });
-    let options = {
-        url: address,
-        headers: {
-            'User-Agent': 'request'
-        }
-    };
     request(options, (error, response, body) => {
         if (error || response.statusCode !== 200) {
-            reject(error ? error : 'statusCode is not 200');
+            reject(error || 'statusCode is not 200');
         }
         let repos = JSON.parse(body);
-        let names = [];
+        let promises = [];
         for (let i = 0; i < repos.length; i++) {
-            if (repos[i].name.indexOf('verstka-tasks') !== -1 ||
-                repos[i].name.indexOf('javascript-tasks') !== -1) {
-                names.push(repos[i].name);
+            let reposName = repos[i].name;
+            if (isAppropriateRepos(reposName)) {
+                promises.push(processingREADME(reposName));
             }
         }
-        let calls = 0;
-        for (let i = 0; i < names.length; i++) {
-            processingREADME(names[i], (error) => {
-                if (error) {
-                    reject(error);
-                }
-                if (++calls === names.length) {
-                    resolve();
-                }
-            });
-        }
+        Promise.all(promises).then(
+            allTexts => {
+                processingText(allTexts);
+                resolve()
+            },
+            error => reject(error)
+        );
     });
 });
 
-function processingREADME(name, callback) {
-    let address = url.format({
-        protocol: 'https',
-        host: GIT_URL,
-        pathname: '/repos/urfu-2015/' + name + '/readme',
-        search: '?access_token=' + OAUTH_TOKEN,
-    });
+function isAppropriateRepos(reposName) {
+    return reposName.indexOf('verstka-tasks') !== -1 ||
+            reposName.indexOf('javascript-tasks') !== -1;
+}
+
+function processingREADME(name) {
     let options = {
-        url: address,
+        url: urlForReadme(name),
         headers: {
             'User-Agent': 'request'
         }
     };
-    request(options, (error, response, body) => {
-        if (!error && response.statusCode === 200) {
-            processingText(JSON.parse(body).content);
-            callback(null);
-        } else {
-            callback(error ? error : 'statusCode is not 200');
-        }
+    return new Promise((resolve,reject) => {
+        request(options, (error, response, body) => {
+            if (!error && response.statusCode === 200) {
+                resolve(JSON.parse(body).content);
+            } else {
+                reject(error || 'statusCode is not 200');
+            }
+        });
+    });   
+}
+
+function urlForReadme(reposName) {
+    return url.format({
+        protocol: 'https',
+        host: GIT_URL,
+        pathname: '/repos/urfu-2015/' + reposName + '/readme',
+        search: '?access_token=' + OAUTH_TOKEN,
     });
 }
 
-function processingText(encodedText) {
-    let decodeText = new Buffer(encodedText, 'base64').toString();
+function processingText(encodedTexts) {
+    let decodeText = '';
+    for (let i = 0; i<encodedTexts.length; i++) {
+        decodeText += new Buffer(encodedTexts[i], 'base64').toString();
+    }
     decodeText = decodeText
         .replace(/[^ЁёА-я \n]/g, '')
         .replace(/\s+/g, ' ')
-        .toLowerCase();
-    let tokenizer = new natural.AggressiveTokenizerRu();
+        .toLowerCase()
+        .split(' ');
     let cleanText = [];
-    decodeText = tokenizer.tokenize(decodeText);
     decodeText.forEach((word) => {
         if (stopWords.indexOf(word) === -1) {
             cleanText.push(word);
@@ -89,64 +96,48 @@ function processingText(encodedText) {
     addToFrequencyArray(cleanText);
 }
 
+
+let Word = function (root, fullWord) {
+    this.root = root;
+    this.fullWord = fullWord;
+    this.count = 1;
+    this.toString = () =>
+        this.fullWord + ' ' + this.count;
+};
+
+function isCognates(word1, word2) {
+    return natural.JaroWinklerDistance(word1, word2) >  0.85;
+}
+
 function addToFrequencyArray(wordArray) {
     for (let i = 0; i < wordArray.length; i++) {
-        let added = false;
+        let isRootExist = false;
         let fullWord = wordArray[i];
         let stemWord = natural.PorterStemmerRu.stem(fullWord);
         for (let j = 0; j < frequencyDict.length; j++) {
-            if (natural.JaroWinklerDistance(fullWord, frequencyDict[j].key) > 0.85) {
-                frequencyDict[j].count += 1;
-                if (frequencyDict[j].fullWords.indexOf(fullWord) === -1) {
-                    frequencyDict[j].fullWords.push(fullWord);
-                }
-                added = true;
+            if (isCognates(fullWord, frequencyDict[j].root))
+            {
+                frequencyDict[j].count++;
+                isRootExist = true;
                 break;
             }
-        }
-        if (added) {
-            continue;
-        }
-        frequencyDict.push({});
-        frequencyDict[frequencyDict.length - 1].key = stemWord;
-        frequencyDict[frequencyDict.length - 1].count = 1;
-        frequencyDict[frequencyDict.length - 1].fullWords = [fullWord];
+        };
+        if (!isRootExist) {
+            frequencyDict.push(new Word(stemWord, fullWord));
+        }        
     }
 }
 
-exports.top = (n) => {
-    if (data_analyzed) {
-        return new Promise((resolve, reject) => {
-            resolve(hiddenTop(n));
-        });
-    }
-    deferredAction.push(function (i) {
-        return () => hiddenTop(i);
-    }(n));
-    return promise.then(
-        result => {
-            data_analyzed = true;
-            while (deferredAction.length !== 0) {
-                let action = deferredAction.shift();
-                return action();
-            }
-        },
-        error => console.log(error)
-    );
-};
+exports.top = (n) => generateFunction(hiddenTop, n);
 
-exports.count = (word) => {
-    if (data_analyzed) {
-        return new Promise((resolve, reject) => {
-            resolve(hiddenCount(word));
-        });
-    }
+exports.count = (word) => generateFunction(hiddenCount, word);
+
+function generateFunction(callback, arg) {
     deferredAction.push(function (i) {
-        return () => hiddenCount(i);
-    }(word));
+        return () => callback(i);
+    }(arg));
     return promise.then(
-        result => {
-            data_analyzed = true;
+        text => {
             while (deferredAction.length !== 0) {
                 let action = deferredAction.shift();
                 return action();
@@ -154,20 +145,20 @@ exports.count = (word) => {
         },
         error => console.log(error)
     );
-};
+}
 
 function hiddenTop(n) {
     frequencyDict.sort(compare).reverse();
     let result = [];
-    for (let i = 0; i < Math.min(n, frequencyDict.length); i++) {
-        result.push(frequencyDict[i].fullWords[0] + ' ' + frequencyDict[i].count);
+    for (let i = 0, length = Math.min(n, frequencyDict.length); i < length; i++) {
+        result.push(frequencyDict[i]);
     };
     return result.join('\n');
 }
 
 function hiddenCount(word) {
     for (let i = 0; i < frequencyDict.length; i++) {
-        if (natural.JaroWinklerDistance(word, frequencyDict[i].key) > 0.85) {
+        if (isCognates(word, frequencyDict[i].root)) {
             return frequencyDict[i].count;
         }
     }
@@ -175,11 +166,5 @@ function hiddenCount(word) {
 }
 
 function compare(a, b) {
-    if (a.count < b.count) {
-        return -1;
-    } else if (a.count > b.count) {
-        return 1;
-    } else {
-        return 0;
-    }
+    return a.count - b.count;
 };
