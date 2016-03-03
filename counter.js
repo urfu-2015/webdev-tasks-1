@@ -1,5 +1,5 @@
 'use strict';
-const request = require('request');
+const rp = require('request-promise');
 const fs = require('fs');
 const natural = require('natural');
 const url = require('url');
@@ -9,6 +9,10 @@ const deferredAction = [];
 const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
 const GIT_URL = 'api.github.com';
 
+exports.top = (n) => generateFunction(hiddenTop, n);
+
+exports.count = (word) => generateFunction(hiddenCount, word);
+
 let address = url.format({
     protocol: 'https',
     host: GIT_URL,
@@ -16,56 +20,52 @@ let address = url.format({
     search: '?access_token=' + OAUTH_TOKEN,
 });
 let options = {
-    url: address,
+    uri: address,
     headers: {
         'User-Agent': 'request'
-    }
+    },
+    transform: promisesFromBody
 };
+let promise = rp(options).then(
+    promises => Promise.all(promises).then(
+        allTexts =>
+            processingText(allTexts),
+        handleError
+    ),
+    handleError
+);
 
-let promise = new Promise((resolve, reject) => {
-    request(options, (error, response, body) => {
-        if (error || response.statusCode !== 200) {
-            reject(error || 'statusCode is not 200');
+function promisesFromBody(body) {
+    let repos = JSON.parse(body);
+    let promises = [];
+    for (let i = 0; i < repos.length; i++) {
+        let reposName = repos[i].name;
+        if (isAppropriateRepos(reposName)) {
+            promises.push(processingREADME(reposName));
         }
-        let repos = JSON.parse(body);
-        let promises = [];
-        for (let i = 0; i < repos.length; i++) {
-            let reposName = repos[i].name;
-            if (isAppropriateRepos(reposName)) {
-                promises.push(processingREADME(reposName));
-            }
-        }
-        Promise.all(promises).then(
-            allTexts => {
-                processingText(allTexts);
-                resolve()
-            },
-            error => reject(error)
-        );
-    });
-});
+    }
+    return promises;
+}
+
+function handleError(error) {
+    console.log(error);
+}
 
 function isAppropriateRepos(reposName) {
     return reposName.indexOf('verstka-tasks') !== -1 ||
-            reposName.indexOf('javascript-tasks') !== -1;
+        reposName.indexOf('javascript-tasks') !== -1;
 }
 
 function processingREADME(name) {
     let options = {
-        url: urlForReadme(name),
+        uri: urlForReadme(name),
         headers: {
             'User-Agent': 'request'
-        }
+        },
+        transform: (body) =>
+            JSON.parse(body).content
     };
-    return new Promise((resolve,reject) => {
-        request(options, (error, response, body) => {
-            if (!error && response.statusCode === 200) {
-                resolve(JSON.parse(body).content);
-            } else {
-                reject(error || 'statusCode is not 200');
-            }
-        });
-    });   
+    return rp(options);  
 }
 
 function urlForReadme(reposName) {
@@ -96,7 +96,6 @@ function processingText(encodedTexts) {
     addToFrequencyArray(cleanText);
 }
 
-
 let Word = function (root, fullWord) {
     this.root = root;
     this.fullWord = fullWord;
@@ -106,7 +105,7 @@ let Word = function (root, fullWord) {
 };
 
 function isCognates(word1, word2) {
-    return natural.JaroWinklerDistance(word1, word2) >  0.85;
+    return natural.JaroWinklerDistance(word1, word2) > 0.85;
 }
 
 function addToFrequencyArray(wordArray) {
@@ -127,10 +126,6 @@ function addToFrequencyArray(wordArray) {
         }        
     }
 }
-
-exports.top = (n) => generateFunction(hiddenTop, n);
-
-exports.count = (word) => generateFunction(hiddenCount, word);
 
 function generateFunction(callback, arg) {
     deferredAction.push(function (i) {
