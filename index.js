@@ -13,9 +13,9 @@ Promise.all([
         .then(val => console.log(val))
         .catch(err => console.log('Error: ' + err)),
     counter.top(10)
-        .then(resMap => {
-            for (let key of resMap.keys()) {
-                console.log(key + ' ' + resMap.get(key));
+        .then(res => {
+            for (let key of Object.keys(res)) {
+                console.log(key + ' ' + res[key]);
             }
         })
         .catch(err => console.log('Error: ' + err))

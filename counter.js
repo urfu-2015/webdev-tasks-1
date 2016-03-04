@@ -5,21 +5,19 @@ const fs = require('fs');
 const request = require('request');
 const Promise = require('bluebird');
 const co = require('co');
-const HashMap = require('hashmap');
 const mystem = require('./index');
 
 function main(callback) {
     return co(function* (){
-        let oauth_token = yield readFile('key.txt');
-        oauth_token = oauth_token.match(/^[^\n]*/)[0];
+        let oauthToken = yield readFile('key.txt');
+        oauthToken = oauthToken.split('\n').shift();
 
-        let repos = yield sendRequest(getOptions('users/urfu-2015/repos', oauth_token, '+json'));
-        repos = JSON.parse(repos)
+        let repos = yield sendRequest('users/urfu-2015/repos', oauthToken, '+json');
+        repos = JSON.parse(repos.pop())
             .map(item => item.name)
             .filter(item => /^(verstka|javascript)-tasks-\d+/i.test(item));
         let readmeText = yield Promise.all(repos.map(item => {
-            return sendRequest(getOptions('repos/urfu-2015/' + item + '/readme', oauth_token,
-                '.VERSION.raw'));
+            return sendRequest('repos/urfu-2015/' + item + '/readme', oauthToken, '.VERSION.raw');
         }));
         readmeText = separateToSingleWords(readmeText);
 
@@ -30,30 +28,31 @@ function main(callback) {
 
         return getAllWordsFreq(data);
     })
-    .then(callback)
-    .catch(console.log);
+    .then(callback);
 }
 
 module.exports.top = function (num) {
     return main(function (words) {
         var keys = Object.keys(words)
             .sort((a, b) => words[b] - words[a]);
-        var resMap = new HashMap();
+
+        var result = {};
         for (var i = 0; i < num; i++) {
-            resMap.set(keys[i], words[keys[i]]);
+            result[keys[i]] = words[keys[i]];
         }
-        return resMap;
+
+        return result;
     });
 };
 
 module.exports.count = function (word) {
     return main(function (words) {
-        return new Promise((resolve, reject) => {
-            mystem.analyze(word)
-            .then(item => {
-                item && item.length > 0 && words[item[0]] ? resolve(words[item[0]]) :
-                    reject('Sorry, your analyzed word -> ' + item + ' doesn\'t exist');
-            });
+        return mystem.analyze(word)
+        .then(item => {
+            if (item && item.length > 0 && words[item[0]]) {
+                return words[item[0]];
+            }
+            throw('Sorry, your analyzed word -> ' + item + ' doesn\'t exist');
         });
     });
 };
@@ -84,25 +83,19 @@ function separateToSingleWords(text) {
         .replace(/\s+/g, ' ');
 }
 
-function getOptions(query, oauth_token, accept) {
+function getOptions(query, oauthToken, accept) {
     return {
-        url: 'https://api.github.com/' + query + '?access_token=' + oauth_token,
+        url: 'https://api.github.com/' + query + '?access_token=' + oauthToken,
         headers: {
-            'User-Agent': 'Yandex',
+            'User-Agent': 'mystem',
             'Accept': 'application/vnd.github' + accept
         }
     };
 }
 
-function sendRequest(options) {
-    return new Promise((resolve, reject) => {
-        request(options, (err, res, body) => {
-            if (err || res.statusCode !== 200) {
-                reject(err);
-            }
-            resolve(body);
-        });
-    });
+function sendRequest(query, oauthToken, accept) {
+    const options = getOptions(query, oauthToken, accept);
+    return Promise.promisify(request)(options);
 }
 
 function readFile(filePath) {

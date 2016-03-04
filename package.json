@@ -2,7 +2,6 @@
   "private": true,
   "dependencies": {
     "co": "^4.6.0",
-    "hashmap": "^2.0.4",
     "jscs": "^2.2.1",
     "mocha": "^2.3.3",
     "mystem3": "https://github.com/DudaGod/node-mystem3.git",
