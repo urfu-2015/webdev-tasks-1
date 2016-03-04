@@ -12,7 +12,13 @@ const words_excl = JSON.parse(fs.readFileSync('./words.json', 'utf-8'));
 const reposUrl = 'https://api.github.com/orgs/urfu-2015/repos';
 const org = 'https://api.github.com/repos/urfu-2015/';
 
-
+/**
+ * Получает статистику встречаемости слов
+ * В зависимости от метода возвращает либо топ arg слов, либо кол-во употреблений слова arg
+ * @param {String} method (top или count)
+ * @param {Number|String} arg Количество n, либо слово word
+ * @param {Function} resultCallback
+ */
 function getStat(method, arg, resultCallback) {
 
     async.waterfall(
@@ -22,34 +28,38 @@ function getStat(method, arg, resultCallback) {
             calculateStat
         ]);
 
+    /**
+     * Передает в callback объект с данными о репозиториях оранизации
+     * @param {Function} callback
+     */
     function getRepos(callback) {
         request(getRequestOptions(reposUrl), function (err, response, body) {
             let resp;
             if (!err && response.statusCode === 200) {
                 try {
                     resp = JSON.parse(body);
+                    callback(null, resp);
                 } catch (err) {
                     callback(err, resp);
                 }
-                callback(null, resp);
             } else {
                 callback(err, resp);
             }
         });
     }
 
+    /**
+     * Передает в callback объект всех слов из текстов задач с их количеством
+     * @param {Object} repos
+     * @param {Function} callback
+     */
     function getReadmeWords(repos, callback) {
         let words = {};
-        const readmePaths = [];
-        repos.forEach(function (repo) {
-            const name = repo.name;
-            if (name && (name.search(/(javascript|verstka)-tasks/) !== -1)) {
-                readmePaths.push(org + name + '/readme');
-            }
-        });
+        const readmeUrls = getReadmeUrls(repos);
 
+        // По каждой ссылке делает request, парсит readme и добавляет слова в words
         async.each(
-            readmePaths,
+            readmeUrls,
 
             (path, next) => {
                 request(getRequestOptions(path), function (err, response, body) {
@@ -73,6 +83,11 @@ function getStat(method, arg, resultCallback) {
             });
     }
 
+    /**
+     * Вычисляет статистику - метод top или count - и передает ее в resultCallback
+     * @param {Object} words
+     * @param {Function} callback
+     */
     function calculateStat(words, callback) {
         let result;
         words_excl.forEach(function (word) {
@@ -82,8 +97,8 @@ function getStat(method, arg, resultCallback) {
         const wordsArr = Object.keys(words);
         let resultObj = {};
         wordsArr.forEach(function (word) {
-            let stem = word.stem();
-            let amount = words[word];
+            const stem = word.stem();
+            const amount = words[word];
             if (resultObj[stem]) {
                 resultObj[stem].words.push(word);
                 resultObj[stem].freq += amount;
@@ -101,10 +116,37 @@ function getStat(method, arg, resultCallback) {
     }
 }
 
+/**
+ * Получает ссылки на файлы readme с текстами задач первого семестра
+ * @param {Object} repos
+ * @returns {Array} readmeUrls
+ */
+function getReadmeUrls(repos) {
+    const readmeUrls = [];
+    repos.forEach(function (repo) {
+        const name = repo.name;
+        if (name && /(javascript|verstka)-tasks/.test(name)) {
+            readmeUrls.push(org + name + '/readme');
+        }
+    });
+    return readmeUrls;
+}
+
+
+/**
+ * Разбивает текст по неподходящим символам и возвращает список слов
+ * @param {String} text
+ * @returns {Array|*}
+ */
 function parseText(text) {
     return text.split(/[^А-Яа-яЁё]+/);
 }
 
+/**
+ * Возвращает опции для запроса
+ * @param url
+ * @returns {{url: *, headers: {user-agent: string}, authorization}}
+ */
 function getRequestOptions(url) {
     return {
         url: url,
@@ -113,6 +155,10 @@ function getRequestOptions(url) {
     };
 }
 
+/**
+ * Записывает объект с данными статистики в файл stat.json
+ * @param obj
+ */
 function writeObj(obj) {
     fs.writeFile('./stat.json', JSON.stringify(obj), err => {
         if (err) {
@@ -123,6 +169,11 @@ function writeObj(obj) {
     });
 }
 
+/**
+ * Сортирует результаты статистики по убыванию и возвращает отсортированный массив
+ * @param resultObj
+ * @returns {Array}
+ */
 function getSortedResult(resultObj) {
     let resultArr = [];
     const rootsArr = Object.keys(resultObj);
@@ -136,6 +187,12 @@ function getSortedResult(resultObj) {
     return resultArr;
 }
 
+/**
+ * Возвращает top n слов
+ * @param {Object} stat
+ * @param n
+ * @returns {Array}
+ */
 function getTop(stat, n) {
     let result;
     if (stat.resultArr) {
@@ -146,38 +203,52 @@ function getTop(stat, n) {
     return result;
 }
 
+/**
+ * Возвращает количество употреблений слова word
+ * @param resultObj
+ * @param word
+ * @returns {*|number}
+ */
 function getCount(resultObj, word) {
     let root = word.stem();
     return resultObj[root].freq || 0;
 }
 
+/**
+ * Возвращает топ n слов (по убыванию) из текстов задач
+ * @param {Number} n
+ * @param {Function} callback
+ */
 module.exports.top = (n, callback) => {
     fs.readFile('./stat.json', 'utf-8', (err, data) => {
-        if (!err) {
-            try {
-                const stat = JSON.parse(data);
-                const result = getTop(stat, n);
-                callback(null, result);
-            } catch (err) {
-                getStat('top', n, callback);
+        try {
+            if (err) {
+                throw new Error(err);
             }
-        } else {
+            const stat = JSON.parse(data);
+            const result = getTop(stat, n);
+            callback(null, result);
+        } catch (err) {
             getStat('top', n, callback);
         }
     });
 };
 
+/**
+ * Возвращает количество слов word в текстах задач
+ * @param {String} word
+ * @param {Function} callback
+ */
 module.exports.count = (word, callback) => {
     fs.readFile('./stat.json', 'utf-8', (err, data) => {
-        if (!err) {
-            try {
-                const stat = JSON.parse(data);
-                const result = getCount(stat.resultObj, word);
-                callback(null, result);
-            } catch (err) {
-                getStat('count', word, callback);
+        try {
+            if (err) {
+                throw new Error(err);
             }
-        } else {
+            const stat = JSON.parse(data);
+            const result = getCount(stat.resultObj, word);
+            callback(null, result);
+        } catch (err) {
             getStat('count', word, callback);
         }
     });
