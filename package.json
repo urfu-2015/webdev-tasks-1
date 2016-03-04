@@ -12,7 +12,7 @@
     "lint": "jscs ."
   },
   "name": "webdev-tasks-1",
-  "description": "Код должен проходить валидацию JSCS.",
+  "description": "Модуль позволяет находить самые популярные слова в readme определенных репозиториев организации urfu-2015.",
   "version": "1.0.0",
   "main": "index.js",
   "repository": {

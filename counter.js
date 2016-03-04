@@ -1,6 +1,6 @@
 'use strict';
 
-const request = require('sync-request');
+const request = require('request');
 const natural = require('natural');
 var stemmer = natural.PorterStemmerRu;
 stemmer.attach();
@@ -11,50 +11,67 @@ const lodash = require('lodash');
 var forbiddenWords = ['в', 'на', 'и', 'не', 'по', 'у', 'к', 'с', 'а', 'для', 'при'];
 
 module.exports.top = function (amount) {
-    var dict = GetDictionary('orgs/urfu-2015/repos');
-    bySortedValue(dict, amount, function (key, value) {
-        console.log(key + ': ' + value);
+    getDictionary('orgs/urfu-2015/repos', function (dict) {
+        bySortedValue(dict, amount, function (key, value) {
+            console.log(key + ': ' + value);});
     });
 };
 
 module.exports.count = function (word) {
     word = word.stem();
-    var dict = GetDictionary('orgs/urfu-2015/repos');
-    var amount = dict[word] ? dict[word] : '0';
-    console.log(word + ': ' + amount);
+    getDictionary('orgs/urfu-2015/repos', function (dict) {
+        var amount = dict[word] ? dict[word] : '0';
+        console.log(word + ': ' + amount);
+    });
 };
 
-var GetDictionary = function (query) {
+function getDictionary (query, callback) {
     var readmes = [];
-    var data = sendRequest(query);
-    var repos = JSON.parse(data.getBody());
-    for (var repo in repos) {
-        if (isRepoSatisfying(repos[repo])) {
-            data = sendRequest('repos/' + repos[repo].full_name + '/readme');
-            if (data) {
-                var text = data.getBody().toString();
-                readmes.push(text.tokenizeAndStem(true));
+    var handledReposAmount = 0;
+    sendRequest(query, function (body) {
+        var repos = JSON.parse(body);
+        for (var repoNumber in repos) {
+            if (isRepoSatisfying(repos[repoNumber])) {
+                sendRequest('repos/' + repos[repoNumber].full_name + '/readme', function (body) {
+                    if (body) {
+                        //var text = data.getBody().toString();
+                        readmes.push(body.tokenizeAndStem(true));
+                        handledReposAmount++;
+                        if (handledReposAmount == repos.length) {
+                            var readmesText = lodash.flatten(readmes);
+                            var dict = {};
+                            readmesText.forEach(function (current, index, array) {
+                                if (/^[а-яё]+$/i.test(current) && forbiddenWords.indexOf(current) == -1) {
+                                    dict[current] = dict[current] ? dict[current] + 1 : 1;
+                                }
+                            });
+                            callback(dict);
+                        }
+                    }
+                });
+            } else {
+                handledReposAmount++;
             }
         }
-    }
-    var readmesText = lodash.flatten(readmes);
-    var dict = {};
-    readmesText.forEach(function (current, index, array) {
-        if (/^[а-яё]+$/i.test(current) && forbiddenWords.indexOf(current) == -1) {
-            dict[current] = dict[current] ? dict[current] + 1 : 1;
-        }
     });
-    return dict;
-};
+}
 
-function sendRequest(path) {
-    return request('GET', url.format({
-        protocol: 'https',
-        hostname: 'api.github.com',
-        pathname: path,
-        query: 'access_token=' + token}), {headers: {
-        'User-Agent': 'Readme Analyzer',
-        Accept: 'application/vnd.github.VERSION.raw'}});
+function sendRequest(path, callback) {
+    request(url.parse('https://api.github.com/' + path + '?access_token=' + token),
+        {
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Readme Analyzer',
+                Accept: 'application/vnd.github.VERSION.raw'
+            }
+        },
+        function (err, response, body) {
+            if (!err && response.statusCode == 200) {
+                callback(body);
+            } else {
+                console.log(err);
+            }
+        });
 }
 
 function isRepoSatisfying(repo) {
@@ -64,19 +81,8 @@ function isRepoSatisfying(repo) {
 }
 
 function bySortedValue(obj, iterationsAmount, callback) {
-    var tuples = [];
+    var sortedKeys = Object.keys(obj).sort(function(a,b){return obj[b]-obj[a]});
 
-    for (var key in obj) {
-        tuples.push([key, obj[key]]);
-    }
-
-    tuples.sort(function (a, b) {
-        return a[1] < b[1] ? 1 : a[1] > b[1] ? -1 : 0;
-    });
-
-    var length = 0;
-    while (length < Math.min(tuples.length, iterationsAmount)) {
-        callback(tuples[length][0], tuples[length][1]);
-        length++;
-    }
+    for (var i=0; i< Math.min(sortedKeys.length, iterationsAmount); i++)
+        callback(sortedKeys[i], obj[sortedKeys[i]]);
 }
