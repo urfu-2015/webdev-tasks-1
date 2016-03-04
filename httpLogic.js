@@ -8,21 +8,20 @@ const config = require('./config');
 
 /**
  * Функция создаём массив из адресов репозиториев, которые мы будем выкачивать.
- * @param prefixOne
- * @param prefixTwo
+ * @param {Array} prefixes
  * @returns {Array} repos
  */
-function getRepos(prefixOne, prefixTwo) {
-    var URIOne;
-    var URITwo;
+function getRepos(prefixes) {
+    var URI;
 
     var repos = [];
 
-    for (var i = 1; i <= config.numberTasks; i++) {
-        // Не смог найти, как здесь нормально перенести строки с этим форматом
-        URIOne = `${config.gitHubApi}/repos/${config.mainRepo}/${prefixOne}${i}/readme/?access_token=${config.key}`;
-        URITwo = `${config.gitHubApi}/repos/${config.mainRepo}/${prefixTwo}${i}/readme/?access_token=${config.key}`;
-        repos.push(URIOne, URITwo);
+    for (var i = 1; i <= config.configObj.numberTasks; i++) {
+        prefixes.forEach(function (prefix) {
+            URI = `${config.configObj.gitHubApi}/repos/${config.configObj.mainRepo}/` +
+                  `${prefix}${i}/readme/?access_token=${config.configObj.key}`;
+            repos.push(URI);
+        });
     }
 
     return repos;
@@ -35,14 +34,10 @@ function getRepos(prefixOne, prefixTwo) {
  */
 function parseAPIResponse(res) {
     var parsedContent;
+    var parsedRes;
 
     try {
-        var parsedRes = JSON.parse(res);
-    } catch (err) {
-        console.error(err);
-    }
-
-    try {
+        parsedRes = JSON.parse(res);
         parsedContent = new Buffer(parsedRes.content, parsedRes.encoding).toString('utf-8');
     } catch (err) {
         console.error(err);
@@ -53,14 +48,13 @@ function parseAPIResponse(res) {
 
 /**
  * Функция, которая асинхронно получает тексты README.md, в зависимости от префикса тасков.
- * @param {string} prefixOne
- * @param {string} prefixTwo
+ * @param {Array} prefixes
  * @param {Function} callback
  */
-function getTasks(prefixOne, prefixTwo, callback) {
+function getTasks(prefixes, callback) {
     var responses = [];
 
-    async.each(getRepos(prefixOne, prefixTwo),
+    async.each(getRepos(prefixes),
         function (URI, cb) {
             asyncRequest({
                     url: encodeURI(URI),
@@ -72,22 +66,19 @@ function getTasks(prefixOne, prefixTwo, callback) {
                 function (err, res, body) {
                     if (!err && res.statusCode === 200) {
                         responses.push(body);
-                    } /* else {
-                        console.error(res.statusCode);
-                    } */
+                    }
                     cb();
                 }
             );
         },
         function (err) {
             if (!err) {
-                var parsedAPIResponses = [];
-                responses.forEach(function (item) {
-                    parsedAPIResponses.push(parseAPIResponse(item));
+                var parsedAPIResponses = responses.map(function (item) {
+                    return parseAPIResponse(item);
                 });
                 callback(null, parsedAPIResponses);
             } else {
-                console.error(err);
+                callback(err, null);
             }
         }
     );
@@ -125,7 +116,7 @@ function getWordsAndRoots(wordsLists, callback) {
 
     async.each(words,
         function (word, cb) {
-            URI = `${config.onlineDictHost}${config.onlineDictPath}${word}`;
+            URI = `${config.configObj.onlineDictHost}${config.configObj.onlineDictPath}${word}`;
             asyncRequest({
                     url: encodeURI(URI),
                     method: 'GET',
@@ -136,12 +127,10 @@ function getWordsAndRoots(wordsLists, callback) {
                 function (err, res, body) {
                     var root = word;
                     if (!err && res.statusCode === 200) {
-                        if (config.rootRegExp.exec(body) !== null) {
-                            root = config.rootRegExp.exec(body)[1];
+                        if (config.configObj.rootRegExp.exec(body) !== null) {
+                            root = config.configObj.rootRegExp.exec(body)[1];
                         }
-                    } /* else {
-                        console.error(res.statusCode);
-                    } */
+                    }
                     wordsRoots[word] = root;
                     cb();
                 }
@@ -151,7 +140,7 @@ function getWordsAndRoots(wordsLists, callback) {
             if (!err) {
                 callback(null, wordsList, wordsRoots);
             } else {
-                console.error(err);
+                callback(err, null, null);
             }
         }
     );

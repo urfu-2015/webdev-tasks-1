@@ -1,13 +1,16 @@
 {
   "private": true,
+  "contributors": [{
+    "name": "Savi",
+    "email": "savichev95@gmail.com"
+  }],
   "dependencies": {
     "jscs": "^2.2.1",
     "mocha": "^2.3.3",
-    "sync-request": "^3.0.0",
     "request": "^2.69.0",
     "async": "^1.5.2"
   },
   "scripts": {
-    "lint": "./node_modules/jscs/bin/jscs ."
+    "lint": "jscs ./"
   }
 }

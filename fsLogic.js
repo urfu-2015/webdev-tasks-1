@@ -10,15 +10,7 @@ const fs = require('fs');
  * @return {string} content
  */
 function readFile(fileName) {
-    var content;
-
-    try {
-        content = fs.readFileSync(fileName, 'utf-8');
-    } catch (err) {
-        console.error(err);
-    }
-
-    return content;
+    return fs.readFileSync(fileName, 'utf-8');
 }
 
 module.exports.readFile = readFile;

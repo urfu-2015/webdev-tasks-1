@@ -5,9 +5,9 @@
 const fsLogic = require('./fsLogic');
 const config = require('./config');
 
-const englishLetterRegExp = new RegExp('[a-z]');
-const numbersRegExp = new RegExp('[0-9]');
-const russianLettersRegExp = new RegExp('[^а-яё]');
+const englishLetterRegExp = /[a-z]/;
+const numbersRegExp = /[0-9]/;
+const russianLettersRegExp = /[^а-яё]/;
 
 /**
  * Функция, которая удаляет все ненужные символы из текста.
@@ -66,9 +66,9 @@ function clean(textsList, callback) {
     var tempText;
     var tempCleanlyWordsList;
 
-    var punctuationMarks = fsLogic.readFile(config.punctuationMarks).split('\n');
-    var prepositions = fsLogic.readFile(config.prepositions).split('\n');
-    var unions = fsLogic.readFile(config.unions).split('\n');
+    var punctuationMarks = fsLogic.readFile(config.configObj.punctuationMarks).split('\n');
+    var prepositions = fsLogic.readFile(config.configObj.prepositions).split('\n');
+    var unions = fsLogic.readFile(config.configObj.unions).split('\n');
 
     textsList.forEach(function (item) {
         tempText = removeSymbols(item, punctuationMarks);

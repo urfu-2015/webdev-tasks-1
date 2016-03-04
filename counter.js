@@ -17,9 +17,10 @@ var usedWords = [];
  * учитывая однокоренные слова.
  * @param {string} word
  */
-function count(word) {
+function count(word, callback) {
     async.waterfall([
-        async.apply(httpLogic.getTasks, config.jsTasksPrefix, config.verstkaTasksPrefix),
+        async.apply(httpLogic.getTasks, [config.configObj.jsTasksPrefix,
+            config.configObj.verstkaTasksPrefix]),
         parseLogic.clean,
         httpLogic.getWordsAndRoots
     ], function (err, wordsList, wordsRoots) {
@@ -27,35 +28,33 @@ function count(word) {
             cacheWords = wordsList;
             cacheWordsRoots = wordsRoots;
             topList[word] = extendCount(word);
-            console.log(topList[word]);
+            callback(null, topList[word]);
         } else {
-            console.error(err);
+            callback(err, null);
         }
     });
 }
 
 function extendCount(word) {
-    var result = 0;
-
-    cacheWords.forEach(function (item) {
-        if ((usedWords.indexOf(item) === -1) &&
-            (cacheWordsRoots[word] === cacheWordsRoots[item])) {
-            result++;
-        }
+    var result = cacheWords.filter(function (item) {
+        return (usedWords.indexOf(item) === -1) &&
+            (cacheWordsRoots[word] === cacheWordsRoots[item]);
     });
 
     usedWords.push(word);
 
-    return result;
+    return result.length;
 }
 
 /**
  * Функция, которая выводит top n слов.
  * @param {Number} n
+ * @param {Function} callback
  */
-function top(n) {
+function top(n, callback) {
     async.waterfall([
-        async.apply(httpLogic.getTasks, config.jsTasksPrefix, config.verstkaTasksPrefix),
+        async.apply(httpLogic.getTasks, [config.configObj.jsTasksPrefix,
+            config.configObj.verstkaTasksPrefix]),
         parseLogic.clean,
         httpLogic.getWordsAndRoots
     ], function (err, wordsList, wordsRoots) {
@@ -75,9 +74,9 @@ function top(n) {
                 return a[1] - b[1];
             });
             var result = getTop(sortableRes.reverse().slice(0, n));
-            console.log(result);
+            callback(null, result);
         } else {
-            console.error(err);
+            callback(err, null);
         }
     });
 }
@@ -88,13 +87,9 @@ function top(n) {
  * @return {Array} prettyTop
  */
 function getTop(list) {
-    var prettyTop = [];
-
-    list.forEach(function (item) {
-        prettyTop.push(item[0].toString() + ': ' + item[1].toString());
+    return list.map(function (item) {
+        return item[0].toString() + ': ' + item[1].toString();
     });
-
-    return prettyTop;
 }
 
 module.exports.count = count;
