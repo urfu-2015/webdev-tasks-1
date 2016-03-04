@@ -13,7 +13,8 @@ var forbiddenWords = ['в', 'на', 'и', 'не', 'по', 'у', 'к', 'с', 'а'
 module.exports.top = function (amount) {
     getDictionary('orgs/urfu-2015/repos', function (dict) {
         bySortedValue(dict, amount, function (key, value) {
-            console.log(key + ': ' + value);});
+            console.log(key + ': ' + value);
+        });
     });
 };
 
@@ -25,7 +26,7 @@ module.exports.count = function (word) {
     });
 };
 
-function getDictionary (query, callback) {
+function getDictionary(query, callback) {
     var readmes = [];
     var handledReposAmount = 0;
     sendRequest(query, function (body) {
@@ -41,7 +42,8 @@ function getDictionary (query, callback) {
                             var readmesText = lodash.flatten(readmes);
                             var dict = {};
                             readmesText.forEach(function (current, index, array) {
-                                if (/^[а-яё]+$/i.test(current) && forbiddenWords.indexOf(current) == -1) {
+                                if (/^[а-яё]+$/i.test(current) &&
+                                    forbiddenWords.indexOf(current) == -1) {
                                     dict[current] = dict[current] ? dict[current] + 1 : 1;
                                 }
                             });
@@ -81,8 +83,11 @@ function isRepoSatisfying(repo) {
 }
 
 function bySortedValue(obj, iterationsAmount, callback) {
-    var sortedKeys = Object.keys(obj).sort(function(a,b){return obj[b]-obj[a]});
+    var sortedKeys = Object.keys(obj).sort(function (a, b) {
+        return obj[b] - obj[a];
+    });
 
-    for (var i=0; i< Math.min(sortedKeys.length, iterationsAmount); i++)
+    for (var i = 0; i < Math.min(sortedKeys.length, iterationsAmount); i++) {
         callback(sortedKeys[i], obj[sortedKeys[i]]);
+    }
 }
