@@ -1,7 +1,3 @@
-/**
- * Created by savi on 27.02.16.
- */
-
 const async = require('async');
 const asyncRequest = require('request');
 const config = require('./config');

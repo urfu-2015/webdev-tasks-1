@@ -1,7 +1,3 @@
-/**
-* @author Savi
-*/
-
 const async = require('async');
 const config = require('./config');
 const httpLogic = require('./httpLogic');
