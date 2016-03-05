@@ -1,9 +1,11 @@
-var fs = require('fs');
-var request = require('request');
-var url = require('url');
-var async = require('async');
-
+const fs = require('fs');
+const request = require('request');
+const url = require('url');
+const async = require('async');
 const token = fs.readFileSync('key.txt', 'utf-8');
+var repoNames;
+var allWords;
+var resultDictionary;
 
 var exclude = getPrepositions();
 
@@ -12,17 +14,29 @@ function getPrepositions() {
 }
 
 module.exports.top = function (n) {
-    receiveRepoNames()
+    new Promise((resolve)=>{resolve()})
+        .then(receiveRepoNames)
         .then(getTaskContent)
         .then(workDictionary)
         .then(findSameWords)
         .then(function (result) {
+            var dict = [];
+            for (var key in result) {
+                if (result.hasOwnProperty(key)){
+                    dict.push([key, result[key]])
+                }
+            }
+            dict.sort(function (a, b) {
+                return b[1].num  - a[1].num;
+            });
             return result.slice(0, n);
         }).then(prettyPrint);
 };
 
 module.exports.count = function (word) {
-    receiveRepoNames()
+
+    new Promise((resolve)=>{resolve()})
+        .then(receiveRepoNames)
         .then(getTaskContent)
         .then(workDictionary)
         .then(findSameWords)
@@ -33,8 +47,11 @@ module.exports.count = function (word) {
                     function (err, res, body) {
                         if (!err) {
                             root = getRoot(res, body, word);
+                        } else {
+                            root = word;
                         }
-                        dict.filter(function (elem) {
+
+                        dict = dict.filter(function (elem) {
                             return elem[0] == root;
                         });
                         if (dict.length == 0) {
@@ -56,6 +73,9 @@ function prettyPrint(dict) {
 }
 
 function receiveRepoNames() {
+    if (repoNames) {
+        return repoNames
+    }
     return new Promise(function (resolve, reject) {
         request({
             headers: {
@@ -66,10 +86,11 @@ function receiveRepoNames() {
                 if (!err && res.statusCode == 200) {
                     var reponames = getRepoNames(JSON.parse(body)).filter(
                         function (elem) {
-                            return (elem.indexOf('task') !== -1);
+                            return (elem.indexOf('tasks') !== -1);
                         }
                     );
                     console.log('repositories names get');
+                    repoNames = reponames;
                     resolve(reponames);
                 } else {
                     reject(err);
@@ -93,6 +114,9 @@ function getTexFromPage(data) {
 }
 
 function getTaskContent(reponames) {
+    if (allWords) {
+        return allWords;
+    }
     var words = [];
     return new Promise(function (resolve, reject) {
         async.each(reponames,
@@ -116,6 +140,7 @@ function getTaskContent(reponames) {
                     reject(err);
                 }
                 console.log('words parsed');
+                allWords = words;
                 resolve(words);
             }
         )
@@ -123,12 +148,15 @@ function getTaskContent(reponames) {
 }
 
 function workDictionary(words) {
+    if (resultDictionary) {
+        return resultDictionary;
+    }
     var dictionary = {};
     words.forEach(function (entry) {
         entry.forEach(function (word) {
             if (word.length > 0 && exclude.indexOf(word) == -1) {
                 if (!dictionary.hasOwnProperty(word)) {
-                    dictionary[word]            = 1;
+                    dictionary[word] = 1;
                 } else {
                     dictionary[word] += 1;
                 }
@@ -136,12 +164,13 @@ function workDictionary(words) {
         });
     });
     console.log('dictionary created');
+    resultDictionary = dictionary;
     return dictionary;
 }
 
 function findSameWords(dictionary) {
     var roots = {};
-    console.log('searchig roots');
+    console.log('searching roots');
     return new Promise(function (resolve) {
         async.forEachOf(dictionary,
             function (num, word, callback) {
@@ -150,42 +179,33 @@ function findSameWords(dictionary) {
                     function (err, res, body) {
                         if (!err) {
                             root = getRoot(res, body, word);
-                        }
-                        if (roots.hasOwnProperty(root)) {
-                            roots[root].words.push(word);
-                            roots[root].num += num;
-                        } else {
-                            roots[root] = {};
-                            roots[root].words = [word];
-                            roots[root].num = num;
+                            if (roots.hasOwnProperty(root)) {
+                                roots[root].words.push(word);
+                                roots[root].num += num;
+                            } else {
+                                roots[root] = {};
+                                roots[root].words = [word];
+                                roots[root].num = num;
+                            }
                         }
                         callback();
                     }
                 )
             },
             function (){
-                var dict = [];
-                for (var key in roots) {
-                    if (roots.hasOwnProperty(key)){
-                        dict.push([key, roots[key]])
-                    }
-                }
-                dict.sort(function (a, b) {
-                    return b[1].num  - a[1].num;
-                });
                 console.log('roots founded');
-                resolve(dict);
+                resolve(roots);
             });
     });
 }
 
-function getRoot(res, body, word) {
+function getRoot(res, body) {
     var root;
-    if (res.statusCode == 200) {
+    if (res.statusCode == 200 && body.indexOf('span class="root">') !== -1) {
         root = body.substring(body.indexOf('span class="root">'));
         root = root.substring(18, root.indexOf('<'));
     } else {
-        root = word;
+        root = '';
     }
     return root;
 }
