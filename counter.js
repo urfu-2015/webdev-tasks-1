@@ -12,6 +12,7 @@ var usedWords = [];
  * Функция, которая получает на вход слово и подсчитывает все его вхождения,
  * учитывая однокоренные слова.
  * @param {string} word
+ * @param {Function} callback
  */
 function count(word, callback) {
     async.waterfall([
@@ -64,7 +65,9 @@ function top(n, callback) {
             });
             var sortableRes = [];
             for (var word in topList) {
-                sortableRes.push([word, topList[word]]);
+                if (topList.hasOwnProperty(word)) {
+                    sortableRes.push([word, topList[word]]);
+                }
             }
             sortableRes.sort(function (a, b) {
                 return a[1] - b[1];
