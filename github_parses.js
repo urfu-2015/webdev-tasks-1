@@ -35,7 +35,7 @@ function githubAuth(key, mainCb, cb) {
     cb(null, mainCb);
 }
 
-function getAllTasksReadme(mainCb) {
+function getAllTasksReadme(arg, mainCb) {
     async.waterfall([
         async.apply(readKey, mainCb),
         githubAuth
@@ -60,7 +60,7 @@ function getAllTasksReadme(mainCb) {
                     callback();
                 }
             }, function () {
-                mainCb(text);
+                mainCb(err, text);
             });
         });
     });

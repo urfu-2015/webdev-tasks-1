@@ -3,6 +3,10 @@ var natural = require('natural');
 var stopWords = require('./stop_words.js');
 var events = require('events');
 var eventEmitter = new events.EventEmitter();
+var async = require('async');
+var ArrayStream = require('arraystream');
+var Promise = require('bluebird');
+var through2 = require('through2');
 
 // Храним статистику
 // Слово -> ['однокоренные']
@@ -61,93 +65,72 @@ function nearestWord(word) {
     return bestWord;
 }
 
-/**
- * Разбивание текста на токены
- * @param text
- * @param cb
- */
-function tokenize(text, cb) {
-    var res = text.match(/[а-яА-я]+/g);
-    cb(res);
-}
+var filterStopWordsTransform = through2.obj(function (chunk, enc, callback) {
+    chunk = chunk.toLowerCase();
+    if (!~stopWords.indexOf(chunk)) {
+        this.push(chunk);
+    }
+    callback();
+});
 
-/**
- * Фильтрация стоп-слов (предлогов и тд.)
- * @param tokens
- * @param cb
- */
-function filterStopWords(tokens, cb) {
-    tokens = tokens.map(function(token) {
-        return token.toLowerCase();
+var stemmingTransform = through2.obj(function (chunk, enc, callback) {
+    this.push([chunk, stemToken(chunk)]);
+    callback();
+});
+
+var calculations = new Promise((resolve, reject) => {
+    var allReadmeTexts = Promise.promisify(github.getAllTasksReadme);
+    allReadmeTexts(null).then(function (text) {
+        var tokens = tokenize(text);
+        var arrStream = ArrayStream
+            .create(tokens)
+            .pipe(filterStopWordsTransform)
+            .pipe(stemmingTransform);
+        arrStream.on('data', function (chunk) {
+            var stemmedToken = chunk[1];
+            var token = chunk[0];
+            clasterCognatesWords(token, stemmedToken);
+        });
+        arrStream.on('end', function () {
+            sortCognatesWords();
+            //console.log(resTokens);
+            resolve();
+        })
     });
-    var res = tokens.filter(function(a){return !~this.indexOf(a);},stopWords);
-    //res = tokens.filter(function(a){return !a.match(/[а-яА-я]{1,2}/g);});
-    cb(res);
+});
+
+function tokenize(text) {
+    return text.match(/[а-яА-я]+/g);
 }
 
-/**
- * Стемминг списка слов
- * @param tokens
- * @param cb
- */
-function stemming(tokens, cb) {
-    var stemmedTokens = tokens.map(function(token) {
-        return stemToken(token);
-    });
-    cb(tokens, stemmedTokens);
-}
-
-/**
- * Разбивание слов на классы 'однокоренных'
- * @param tokens
- * @param stemmedTokens
- * @param cb
- */
-function sortCognatesWords(tokens, stemmedTokens, cb) {
-    stemmedTokens.forEach(function(stemmedToken, idx) {
-        if (!resTokens[tokens[idx]]) {
-            // Проверяем слово с представителями 'однокоренных'
-            // (ключами словаря)
-            // Если совпадение 'хорошее', то добавим его в однокоренные
-            var added = false;
-            for (var key in resTokens) {
-                if (congateRate(stemToken(key), stemmedToken) > 0.87) {
-                    resTokens[key].push(tokens[idx]);
-                    added = true;
-                }
+function clasterCognatesWords(token, stemmedToken) {
+    if (!resTokens[token]) {
+        // Проверяем слово с представителями 'однокоренных'
+        // (ключами словаря)
+        // Если совпадение 'хорошее', то добавим его в однокоренные
+        var added = false;
+        for (var key in resTokens) {
+            if (congateRate(stemToken(key), stemmedToken) > 0.87) {
+                resTokens[key].push(token);
+                added = true;
             }
-            // Если слово не 'совпало' ни с одним,
-            // полагаем, что это слово с новым корнем
-            if (!added) {
-                resTokens[tokens[idx]] = [tokens[idx]];
-            }
-        } else {
-            resTokens[tokens[idx]].push(tokens[idx]);
         }
-    });
+        // Если слово не 'совпало' ни с одним,
+        // полагаем, что это слово с новым корнем
+        if (!added) {
+            resTokens[token] = [token];
+        }
+    } else {
+        resTokens[token].push(token);
+    }
+}
+
+function sortCognatesWords() {
     sortStat = Object.keys(resTokens).map(function (key) {
         return [key, resTokens[key].length];
     });
     sortStat.sort(function (first, second) {
         return second[1] - first[1];
-    });
-    cb();
-}
-
-/**
- * Последовательно делаем анализ
- * Результат кладем в глобальную переменную
- * @param cb
- */
-function calculate(cb) {
-    github.getAllTasksReadme(function(text){
-        tokenize(text, function(tokens) {
-            filterStopWords(tokens, function(tokens) {
-                stemming(tokens, function(tokens, stemmedTokens) {
-                    sortCognatesWords(tokens, stemmedTokens, cb);
-                })
-            })
-        })
     });
 }
 
@@ -159,15 +142,14 @@ function top(n) {
     function printResults() {
         eventEmitter.emit('calcFinished');
         calcInProgress = false;
-        sortStat.slice(0, n).forEach(function(item) {
+        sortStat.slice(0, n).forEach((item) => {
             console.log(item[0], item[1]);
         });
     }
     // Если еще не делали анализ
     if (!sortStat.length && !calcInProgress) {
-        eventEmitter.emit('calcInProgress');
         calcInProgress = true;
-        calculate(printResults);
+        calculations.then(printResults);
     } else {
         // Если кто-то считает уже, то
         // ждем, пока досчитается
@@ -200,9 +182,8 @@ function count(word) {
     }
     // Если еще не делали анализ
     if (!sortStat.length && !calcInProgress) {
-        eventEmitter.emit('calcInProgress');
         calcInProgress = true;
-        calculate(printResults);
+        calculations.then(printResults);
     } else {
         // Если кто-то считает уже, то
         // ждем, пока досчитается
@@ -211,7 +192,7 @@ function count(word) {
 }
 
 //count('котиков');
+
 module.exports.count = count;
 module.exports.top = top;
 module.exports.resTokens = resTokens;
-
