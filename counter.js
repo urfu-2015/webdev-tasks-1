@@ -22,57 +22,36 @@ var totalWords = 0;
 top(10);
 
 function getReposList(username, finalCallback) {
-    var req_options = {
-        url: GITHUB_API_URL + '/users/' + username + '/repos',
-        headers: {
-            'User-Agent': 'js'
-        },
-        qs: {
-            access_token: GITHUB_ACCESS_TOKEN
-        }
-    };
-    var repos = null;
-    request(req_options,
+    sendRequestToGithub('/users/' + username + '/repos',
         function (err, res, body) {
-            if (!err && res.statusCode === 200) {
-                var repos = JSON.parse(body);
-                repos = repos.filter(function (json) {
-                    return /(^verstka-tasks.*)|(^javascript-tasks.*)/.test(json.name);
-                })
-                    .map(function (json) {
-                        return json.name;
-                    });
-                repos.forEach(function (name) {
-                    getRepoReadme(username, name, finalCallback);
-                    workingFuncs++;
+        if (!err && res.statusCode === 200) {
+            var repos = JSON.parse(body);
+            repos = repos.filter(function (json) {
+                return /(^verstka-tasks.*)|(^javascript-tasks.*)/.test(json.name);
+            })
+                .map(function (json) {
+                    return json.name;
                 });
-            }
+            repos.forEach(function (name) {
+                getRepoReadme(username, name, finalCallback);
+                workingFuncs++;
+            });
         }
-    );
+    });
 }
 
 function getRepoReadme(username, repoName, finalCallback) {
-    var req_options = {
-        url: GITHUB_API_URL + '/repos/' + username + '/' + repoName + '/readme',
-        headers: {
-            'User-Agent': 'js'
-        },
-        qs: {
-            access_token: GITHUB_ACCESS_TOKEN
-        }
-    };
-    request(req_options,
+    sendRequestToGithub('/repos/' + username + '/' + repoName + '/readme',
         function (err, res, body) {
             if (!err && res.statusCode === 200) {
                 var readme = JSON.parse(body);
                 parseText(new Buffer(readme.content, 'base64').toString('utf-8'), finalCallback);
             }
-        }
-    );
+        });
 }
 
 function parseText(text, finalCallback) {
-    text = text.toLowerCase().replace('ё', 'е').replace(/[a-z0-9]/g, '');
+    text = text.toLowerCase().replace('ё', 'е').replace(/\w/g, '');
     var tokenizer = new natural.AggressiveTokenizerRu();
     var words = tokenizer.tokenize(text);
     words.forEach(function (word) {
@@ -149,7 +128,23 @@ function sortCount(a, b) {
     return b.count - a.count;
 }
 
+function sendRequestToGithub(urlPart, func) {
+    var reqOptions = {
+        url: GITHUB_API_URL + urlPart,
+        headers: {
+            'User-Agent': 'js'
+        },
+        qs: {
+            access_token: GITHUB_ACCESS_TOKEN
+        }
+    };
+    request(reqOptions, func);
+}
+
+
+
 module.exports = {
     count: count,
     top: top
 };
+
