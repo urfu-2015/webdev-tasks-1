@@ -1,6 +1,7 @@
 {
   "private": true,
   "dependencies": {
+    "async": "^1.5.2",
     "jscs": "^2.2.1",
     "lodash": "^4.5.1",
     "mocha": "^2.3.3",

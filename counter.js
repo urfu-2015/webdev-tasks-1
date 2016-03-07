@@ -8,58 +8,70 @@ const fs = require('fs');
 const token = fs.readFileSync('token.txt');
 const url = require('url');
 const lodash = require('lodash');
+const async = require('async');
 var forbiddenWords = ['в', 'на', 'и', 'не', 'по', 'у', 'к', 'с', 'а', 'для', 'при'];
 
 module.exports.top = function (amount) {
-    getDictionary('orgs/urfu-2015/repos', function (dict) {
-        bySortedValue(dict, amount, function (key, value) {
-            console.log(key + ': ' + value);
-        });
+    getDictionary('orgs/urfu-2015/repos', function (err, dict) {
+        if (!err) {
+            bySortedValue(dict, amount, function (key, value) {
+                console.log(key + ': ' + value);
+            });
+        } else {
+            console.log(err);
+        }
     });
 };
 
 module.exports.count = function (word) {
     word = word.stem();
-    getDictionary('orgs/urfu-2015/repos', function (dict) {
-        var amount = dict[word] ? dict[word] : '0';
-        console.log(word + ': ' + amount);
+    getDictionary('orgs/urfu-2015/repos', function (err, dict) {
+        if (!err) {
+            var amount = dict[word] ? dict[word] : '0';
+            console.log(word + ': ' + amount);
+        } else {
+            console.log(err);
+        }
     });
 };
 
 function getDictionary(query, callback) {
-    var readmes = [];
-    var handledReposAmount = 0;
-    sendRequest(query, function (body) {
+    sendRequest(query, function (err, body) {
         var repos = JSON.parse(body);
-        for (var repoNumber in repos) {
-            if (isRepoSatisfying(repos[repoNumber])) {
-                sendRequest('repos/' + repos[repoNumber].full_name + '/readme', function (body) {
+        async.map(repos, function (repo, innerCallback) {
+            if (isRepoSatisfying(repo)) {
+                sendRequest('repos/' + repo.full_name + '/readme', function (err, body) {
                     if (body) {
-                        //var text = data.getBody().toString();
-                        readmes.push(body.tokenizeAndStem(true));
-                        handledReposAmount++;
-                        if (handledReposAmount == repos.length) {
-                            var readmesText = lodash.flatten(readmes);
-                            var dict = {};
-                            readmesText.forEach(function (current, index, array) {
-                                if (/^[а-яё]+$/i.test(current) &&
-                                    forbiddenWords.indexOf(current) == -1) {
-                                    dict[current] = dict[current] ? dict[current] + 1 : 1;
-                                }
-                            });
-                            callback(dict);
-                        }
+                        innerCallback(null, body.tokenizeAndStem(true));
                     }
                 });
             } else {
-                handledReposAmount++;
+                innerCallback(null, []);
             }
-        }
+        }, function (err, readmes) {
+            if (err) {
+                console.log(err);
+            }
+            var readmesText = lodash.flatten(readmes);
+            var dict = {};
+            readmesText.forEach(function (current, index, array) {
+                if (/^[а-яё]+$/i.test(current) &&
+                    forbiddenWords.indexOf(current) == -1) {
+                    dict[current] = dict[current] ? dict[current] + 1 : 1;
+                }
+            });
+            callback(err, dict);
+        });
     });
 }
 
 function sendRequest(path, callback) {
-    request(url.parse('https://api.github.com/' + path + '?access_token=' + token),
+    request(url.format({
+            protocol: 'https',
+            hostname: 'api.github.com',
+            pathname: path,
+            search: '?access_token=' + token
+        }),
         {
             method: 'GET',
             headers: {
@@ -69,7 +81,7 @@ function sendRequest(path, callback) {
         },
         function (err, response, body) {
             if (!err && response.statusCode == 200) {
-                callback(body);
+                callback(err, body);
             } else {
                 console.log(err);
             }
@@ -78,8 +90,8 @@ function sendRequest(path, callback) {
 
 function isRepoSatisfying(repo) {
     return repo &&
-        (repo.full_name.indexOf('verstka-tasks') != -1 ||
-        repo.full_name.indexOf('javascript-tasks') != -1);
+        (repo.full_name.indexOf('verstka-tasks-1') != -1 ||
+        repo.full_name.indexOf('javascript-tasks-1') != -1);
 }
 
 function bySortedValue(obj, iterationsAmount, callback) {
