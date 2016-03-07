@@ -7,8 +7,8 @@ const Promise = require('bluebird');
 const co = require('co');
 const mystem = require('./index');
 
-function main(callback) {
-    return co(function* (){
+function main() {
+    return co(function* () {
         let oauthToken = yield readFile('key.txt');
         oauthToken = oauthToken.split('\n').shift();
 
@@ -27,16 +27,16 @@ function main(callback) {
         ]);
 
         return getAllWordsFreq(data);
-    })
-    .then(callback);
+    });
 }
 
 module.exports.top = function (num) {
-    return main(function (words) {
-        var keys = Object.keys(words)
+    return co(function* () {
+        const words = yield main();
+        const keys = Object.keys(words)
             .sort((a, b) => words[b] - words[a]);
 
-        var result = {};
+        let result = {};
         for (var i = 0; i < num; i++) {
             result[keys[i]] = words[keys[i]];
         }
@@ -46,14 +46,13 @@ module.exports.top = function (num) {
 };
 
 module.exports.count = function (word) {
-    return main(function (words) {
-        return mystem.analyze(word)
-        .then(item => {
-            if (item && item.length > 0 && words[item[0]]) {
-                return words[item[0]];
-            }
-            throw('Sorry, your analyzed word -> ' + item + ' doesn\'t exist');
-        });
+    return co(function* () {
+        const words = yield main();
+        const stemWord = yield mystem.analyze(word);
+        if (stemWord && stemWord.length > 0 && words[stemWord[0]]) {
+            return words[stemWord[0]];
+        }
+        throw('Sorry, your analyzed word -> ' + stemWord + ' doesn\'t exist');
     });
 };
 
@@ -79,7 +78,6 @@ function getAllWordsFreq(data) {
 function separateToSingleWords(text) {
     return text.join(' ')
         .replace(/[^а-яё\s-]+/gi, '')
-        .replace(/(^|[^а-яё])[а-яё](?![а-яё])/gi, '')
         .replace(/\s+/g, ' ');
 }
 
