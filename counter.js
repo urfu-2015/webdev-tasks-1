@@ -5,29 +5,28 @@ const fs = require('fs');
 const request = require('request');
 const Promise = require('bluebird');
 const co = require('co');
+const url = require('url');
 const mystem = require('./index');
 
-function main() {
-    return co(function* () {
-        let oauthToken = yield readFile('key.txt');
-        oauthToken = oauthToken.split('\n').shift();
+function* main() {
+    let oauthToken = yield readFile('key.txt');
+    oauthToken = oauthToken.split('\n').shift();
 
-        let repos = yield sendRequest('users/urfu-2015/repos', oauthToken, '+json');
-        repos = JSON.parse(repos.pop())
-            .map(item => item.name)
-            .filter(item => /^(verstka|javascript)-tasks-\d+/i.test(item));
-        let readmeText = yield Promise.all(repos.map(item => {
-            return sendRequest('repos/urfu-2015/' + item + '/readme', oauthToken, '.VERSION.raw');
-        }));
-        readmeText = separateToSingleWords(readmeText);
+    let repos = yield sendRequest('users/urfu-2015/repos', oauthToken, '+json');
+    repos = JSON.parse(repos.pop())
+        .map(item => item.name)
+        .filter(item => /^(verstka|javascript)-tasks-\d+/i.test(item));
+    let readmeText = yield Promise.all(repos.map(item => {
+        return sendRequest('repos/urfu-2015/' + item + '/readme', oauthToken, '.VERSION.raw');
+    }));
+    readmeText = separateToSingleWords(readmeText);
 
-        const data = yield Promise.all([
-            readFile('prepositions.txt'),
-            mystem.analyze(readmeText)
-        ]);
+    const data = yield Promise.all([
+        readFile('prepositions.txt'),
+        mystem.analyze(readmeText)
+    ]);
 
-        return getAllWordsFreq(data);
-    });
+    return getAllWordsFreq(data);
 }
 
 module.exports.top = function (num) {
@@ -82,8 +81,14 @@ function separateToSingleWords(text) {
 }
 
 function getOptions(query, oauthToken, accept) {
+    const requestedUrl = {
+        protocol: 'https',
+        host: 'api.github.com',
+        pathname: query,
+        search: 'access_token=' + oauthToken
+    };
     return {
-        url: 'https://api.github.com/' + query + '?access_token=' + oauthToken,
+        url: url.format(requestedUrl),
         headers: {
             'User-Agent': 'mystem',
             'Accept': 'application/vnd.github' + accept
