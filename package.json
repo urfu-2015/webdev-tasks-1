@@ -1,10 +1,29 @@
 {
   "private": true,
   "dependencies": {
+    "async": "^1.5.2",
     "jscs": "^2.2.1",
-    "mocha": "^2.3.3"
+    "lodash": "^4.5.1",
+    "mocha": "^2.3.3",
+    "natural": "^0.2.1",
+    "request": "^2.69.0",
+    "sync-request": "^3.0.0"
   },
   "scripts": {
     "lint": "jscs ."
-  }
+  },
+  "name": "webdev-tasks-1",
+  "description": "Модуль позволяет находить самые популярные слова в readme определенных репозиториев организации urfu-2015.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dodo888/webdev-tasks-1.git"
+  },
+  "author": "Vladimir Smirnov",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Dodo888/webdev-tasks-1/issues"
+  },
+  "homepage": "https://github.com/Dodo888/webdev-tasks-1#readme"
 }
