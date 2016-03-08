@@ -21,10 +21,10 @@ function* main() {
     }));
     readmeText = separateToSingleWords(readmeText);
 
-    const data = yield Promise.all([
+    const data = yield [
         readFile('prepositions.txt'),
         mystem.analyze(readmeText)
-    ]);
+    ];
 
     return getAllWordsFreq(data);
 }
