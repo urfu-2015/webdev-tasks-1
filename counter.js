@@ -27,11 +27,12 @@ function getAuthenticate(github, callback) {
 
 function getAllReadme(github, repos, callback) {
     var text = '';
+    var latestDate = new Date(2016, 0, 1);
     async.each(repos, function (repo, callback) {
         var repoName = repo['name'];
         var createDate = new Date(repo['created_at']);
         if (repoName.indexOf('task') >= 0 &&
-            createDate < new Date(2016, 0, 1)) {
+            createDate < latestDate) {
             github.repos.getReadme({
                     user: 'urfu-2015',
                     repo: repoName
@@ -52,7 +53,7 @@ function getRepoReadme(github, callback) {
     github.repos.getFromOrg({
         org: 'urfu-2015'
     }, function (error, repos) {
-        getAllReadme.call(null, github, repos, callback);
+        getAllReadme(github, repos, callback);
     });
 }
 
@@ -80,12 +81,17 @@ function getRootsHash(text, callback) {
 }
 
 function count(word, hash, callback) {
+    word = word.toString();
     var root = natural.PorterStemmerRu.stem(word);
     var counter = hash[root] ? hash[root].counter : 0;
-    callback(null, word + ' ' + counter.toString(10));
+    callback(null, word + ' ' + counter);
 }
 
 function top(count, hash, callback) {
+    if (parseInt(count) !== count) {
+        console.log('Error! Wrong params!');
+        return;
+    }
     var keys = Object.keys(hash);
     keys.sort(function (a, b) {
         return hash[b].counter - hash[a].counter;
@@ -95,19 +101,14 @@ function top(count, hash, callback) {
     }
 }
 
-function worker(param, type, callback) {
+function worker(handler, param, callback) {
     async.waterfall([
         getGitHubApi,
         getAuthenticate,
         getRepoReadme,
         getRootsHash
     ], function (error, hash) {
-        if (type === 'count') {
-            count(param, hash, callback);
-        }
-        if (type === 'top') {
-            top(param, hash, callback);
-        }
+        handler(param, hash, callback);
     });
 }
 
@@ -116,13 +117,11 @@ function printResult(error, data) {
 }
 
 module.exports.count = function (word) {
-    worker(word.toString(), 'count', printResult);
+    worker(count, word, printResult);
 };
 
 module.exports.top = function (count) {
-    if (parseInt(count) === count) {
-        worker(count, 'top', printResult);
-    }
+    worker(top, count, printResult);
 };
 
 module.exports.count(10);
