@@ -41,8 +41,14 @@ function getDictionary(query, callback) {
         async.map(repos, function (repo, innerCallback) {
             if (isRepoSatisfying(repo)) {
                 sendRequest('repos/' + repo.full_name + '/readme', function (err, body) {
-                    if (body) {
-                        innerCallback(null, body.tokenizeAndStem(true));
+                    if (err) {
+                        innerCallback(err);
+                    } else {
+                        if (body) {
+                            innerCallback(null, body.tokenizeAndStem(true));
+                        } else {
+                            innerCallback(null, []);
+                        }
                     }
                 });
             } else {
@@ -70,7 +76,7 @@ function sendRequest(path, callback) {
             protocol: 'https',
             hostname: 'api.github.com',
             pathname: path,
-            search: '?access_token=' + token
+            query: '?access_token=' + token
         }),
         {
             method: 'GET',
@@ -83,7 +89,7 @@ function sendRequest(path, callback) {
             if (!err && response.statusCode == 200) {
                 callback(err, body);
             } else {
-                console.log(err);
+                callback(err);
             }
         });
 }
