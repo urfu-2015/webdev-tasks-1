@@ -3,9 +3,7 @@ const request = require('request');
 const url = require('url');
 const async = require('async');
 const token = fs.readFileSync('key.txt', 'utf-8');
-var repoNames;
 var allWords;
-var resultDictionary;
 
 var exclude = getPrepositions();
 
@@ -14,8 +12,7 @@ function getPrepositions() {
 }
 
 module.exports.top = function (n) {
-    new Promise((resolve)=>{resolve()})
-        .then(receiveRepoNames)
+    receiveRepoNames()
         .then(getTaskContent)
         .then(workDictionary)
         .then(findSameWords)
@@ -23,20 +20,20 @@ module.exports.top = function (n) {
             var dict = [];
             for (var key in result) {
                 if (result.hasOwnProperty(key)){
-                    dict.push([key, result[key]])
+                    if (key != ''){
+                        dict.push([key, result[key]])
+                    }
                 }
             }
             dict.sort(function (a, b) {
                 return b[1].num  - a[1].num;
             });
-            return result.slice(0, n);
+            return dict.slice(0, n);
         }).then(prettyPrint);
 };
 
 module.exports.count = function (word) {
-
-    new Promise((resolve)=>{resolve()})
-        .then(receiveRepoNames)
+    receiveRepoNames()
         .then(getTaskContent)
         .then(workDictionary)
         .then(findSameWords)
@@ -46,18 +43,14 @@ module.exports.count = function (word) {
                 request('http://vnutrislova.net/' + encodeURI('разбор/по-составу/' + word),
                     function (err, res, body) {
                         if (!err) {
-                            root = getRoot(res, body, word);
+                            root = getRoot(res, body);
                         } else {
                             root = word;
                         }
-
-                        dict = dict.filter(function (elem) {
-                            return elem[0] == root;
-                        });
-                        if (dict.length == 0) {
+                        if (!dict.hasOwnProperty(root) || root == '') {
                             return 0;
                         }
-                        prettyPrint(dict);
+                        prettyPrint([[root, dict[root]]]);
                         resolve(dict);
                     }
                 );
@@ -73,39 +66,27 @@ function prettyPrint(dict) {
 }
 
 function receiveRepoNames() {
-    if (repoNames) {
-        return repoNames
-    }
+    console.log('getting repositories names');
+    var options = {headers: {'User-Agent': 'mdf-app'},
+        uri:'https://api.github.com/orgs/urfu-2015/repos?access_token=' + token};
     return new Promise(function (resolve, reject) {
-        request({
-            headers: {
-                'User-Agent': 'mdf-app'
-            },
-            uri:'https://api.github.com/orgs/urfu-2015/repos?access_token=' + token},
-            function (err, res, body) {
-                if (!err && res.statusCode == 200) {
-                    var reponames = getRepoNames(JSON.parse(body)).filter(
-                        function (elem) {
-                            return (elem.indexOf('tasks') !== -1);
-                        }
-                    );
-                    console.log('repositories names get');
-                    repoNames = reponames;
-                    resolve(reponames);
-                } else {
-                    reject(err);
-                }
+        request(options, function (err, res, body) {
+            if (!err && res.statusCode == 200) {
+                var reponames = getRepoNames(
+                    JSON.parse(body)).filter((elem) => (elem.indexOf('tasks-2') !== -1)
+                );
+                console.log('repositories names get');
+                resolve(reponames);
+            } else {
+                reject(err);
             }
-        )
+        })
     });
-
 }
 
 function getRepoNames(data) {
     var result = [];
-    data.forEach(function (repoName) {
-        result.push(repoName.name)
-    });
+    data.forEach((repoName) => {result.push(repoName.name)});
     return result;
 }
 
@@ -114,43 +95,33 @@ function getTexFromPage(data) {
 }
 
 function getTaskContent(reponames) {
-    if (allWords) {
-        return allWords;
-    }
+    console.log('getting task content');
     var words = [];
     return new Promise(function (resolve, reject) {
-        async.each(reponames,
-            function (elem, callback) {
-                request({
-                        headers: {'User-Agent': 'mdf-app'},
-                        uri:'https://raw.githubusercontent.com/urfu-2015/' + elem + '/master/README.md'
-                    },
-                    function (err, res, body) {
-                        if (!err && res.statusCode == 200) {
-                            words.push(getTexFromPage(body).split(/\s+/));
-                            callback();
-                        } else {
-                            callback(err);
-                        }
-                    }
-                );
-            },
-            function (err) {
-                if (err){
-                    reject(err);
+        async.each(reponames, function (elem, callback) {
+            var options = {headers: {'User-Agent': 'mdf-app'},
+                uri:'https://raw.githubusercontent.com/urfu-2015/' + elem + '/master/README.md'};
+            request(options, function (err, res, body) {
+                if (!err && res.statusCode == 200) {
+                    words.push(getTexFromPage(body).split(/\s+/));
+                    callback();
+                } else {
+                    callback(err);
                 }
+            });
+        }, function (err) {
+            if (err){
+                reject(err);
+            } else {
                 console.log('words parsed');
                 allWords = words;
                 resolve(words);
             }
-        )
+        })
     })
 }
 
 function workDictionary(words) {
-    if (resultDictionary) {
-        return resultDictionary;
-    }
     var dictionary = {};
     words.forEach(function (entry) {
         entry.forEach(function (word) {
@@ -164,7 +135,6 @@ function workDictionary(words) {
         });
     });
     console.log('dictionary created');
-    resultDictionary = dictionary;
     return dictionary;
 }
 
@@ -174,23 +144,22 @@ function findSameWords(dictionary) {
     return new Promise(function (resolve) {
         async.forEachOf(dictionary,
             function (num, word, callback) {
+                var url = 'http://vnutrislova.net/' + encodeURI('разбор/по-составу/' + word);
                 var root;
-                request('http://vnutrislova.net/' + encodeURI('разбор/по-составу/' + word),
-                    function (err, res, body) {
-                        if (!err) {
-                            root = getRoot(res, body, word);
-                            if (roots.hasOwnProperty(root)) {
-                                roots[root].words.push(word);
-                                roots[root].num += num;
-                            } else {
-                                roots[root] = {};
-                                roots[root].words = [word];
-                                roots[root].num = num;
-                            }
+                request(url, function (err, res, body) {
+                    if (!err) {
+                        root = getRoot(res, body);
+                        if (roots.hasOwnProperty(root)) {
+                            roots[root].words.push(word);
+                            roots[root].num += num;
+                        } else {
+                            roots[root] = {};
+                            roots[root].words = [word];
+                            roots[root].num = num;
                         }
-                        callback();
                     }
-                )
+                    callback();
+                })
             },
             function (){
                 console.log('roots founded');
