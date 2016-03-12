@@ -1,17 +1,16 @@
 {
   "private": true,
   "dependencies": {
-    "jscs": "^2.2.1",
-    "mocha": "^2.3.3",
-    "natural": "^0.2.1",
-    "request": "^2.69.0"
+    "async": "^1.5.2",
+    "github": "^0.2.4",
+    "natural": "^0.2.1"
   },
   "scripts": {
     "lint": "jscs ."
   },
   "name": "wordcounter",
   "description": "Программа для подсчета количества употреблений слов.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "counter.js",
   "repository": {
     "type": "git",
@@ -27,5 +26,8 @@
   "bugs": {
     "url": "https://github.com/VasiliiKuznecov/webdev-tasks-1/issues"
   },
-  "homepage": "https://github.com/VasiliiKuznecov/webdev-tasks-1#readme"
+  "homepage": "https://github.com/VasiliiKuznecov/webdev-tasks-1#readme",
+  "devDependencies": {
+    "jscs": "^2.11.0"
+  }
 }
