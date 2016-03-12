@@ -14,7 +14,7 @@ const GIT_URL = 'api.github.com';
  * @param {Number} n - количестов слов, которые нужно вернуть
  * @returns {Promis} promise
  */
-exports.top = (n) => generatePromis(hiddenTop, n);
+exports.top = (n) => generatePromise(hiddenTop, n);
 
 /**
  * Возвращает Promise, который при завершении без ошибок возвращает
@@ -22,7 +22,7 @@ exports.top = (n) => generatePromis(hiddenTop, n);
  * @param {String} word - слово для поиска
  * @returns {Promis} promise
  */
-exports.count = (word) => generatePromis(hiddenCount, word);
+exports.count = (word) => generatePromise(hiddenCount, word);
 
 let address = url.format({
     protocol: 'https',
@@ -52,7 +52,7 @@ let promise = rp(options).then(
 /**
  * Формируем и возвращает массив промисов,
  * каждый из промисов обрабатывает один запрос к README подходящего по имени репозитория.
- * @param {Json} body - список репозиториев полцченный
+ * @param {Json} body - список репозиториев
  * @returns {Array} promises - массив промисов
  */
 function promisesFromBody(body) {
@@ -70,7 +70,7 @@ function promisesFromBody(body) {
  * @param {error} error - ошибка
  */
 function handleError(error) {
-    console.log(error);
+    console.error(error);
 }
 
 /**
@@ -111,7 +111,9 @@ function urlForReadme(reposName) {
         protocol: 'https',
         host: GIT_URL,
         pathname: '/repos/urfu-2015/' + reposName + '/readme',
-        search: '?access_token=' + OAUTH_TOKEN
+        query: {
+            'access_token': OAUTH_TOKEN 
+        }
     });
 }
 
@@ -189,13 +191,13 @@ function addWordToDict(word) {
  * @param {String|Number} arg - аргумент с которым вызывается callback
  * @returns {Promis} promise
  */
-function generatePromis(callback, arg) {
+function generatePromise(callback, arg) {
     deferredAction.push(function (i) {
         return () => callback(i);
     }(arg));
     return promise.then(
         () => deferredAction.shift()(),
-        error => console.log(error)
+        handleError
     );
 }
 
