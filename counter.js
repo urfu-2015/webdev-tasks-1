@@ -59,7 +59,7 @@ let promise = rp(options).then(
 function promisesFromBody(body) {
     let repos = JSON.parse(body);
     return repos.reduce((promises, rep) => {
-        if (isAppropriateRepos(rep.name)) {
+        if (isAppropriateRep(rep.name)) {
             promises.push(processingREADME(rep.name));
         }
         return promises;
@@ -79,9 +79,8 @@ function handleError(error) {
  * @param {String} reposName - имя репозитория
  * @returns {bool} true если, имя репозитория подходит, иначе false
  */
-function isAppropriateRepos(reposName) {
-    return reposName.indexOf('verstka-tasks') !== -1 ||
-        reposName.indexOf('javascript-tasks') !== -1;
+function isAppropriateRep(reposName) {
+    return /tasks/.test(reposName);
 }
 
 /**
