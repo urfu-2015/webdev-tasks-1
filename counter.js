@@ -1,10 +1,11 @@
 'use strict';
 const rp = require('request-promise');
 const fs = require('fs');
+const _ = require('lodash');
 const natural = require('natural');
 const url = require('url');
 const OAUTH_TOKEN = fs.readFileSync('./key.txt', 'utf-8');
-const frequencyDict = [];
+const freqDict = [];
 const deferredAction = [];
 const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
 const GIT_URL = 'api.github.com';
@@ -130,12 +131,7 @@ function processingText(encodedTexts) {
         .replace(/\s+/g, ' ')
         .toLowerCase()
         .split(' ');
-    let cleanText = decodeText.reduce((cleanText, word) => {
-        if (stopWords.indexOf(word) === -1) {
-            cleanText.push(word);
-        }
-        return cleanText;
-    }, []);
+    let cleanText = _.filter(decodeText, word => stopWords.indexOf(word) === -1);
     addWordArrayToDict(cleanText);
 }
 
@@ -156,10 +152,19 @@ let Word = function (word) {
  * Проверяет являются ли слова word1 и word2 однокоренными
  * @param {String} word1 - первое слово
  * @param {String} word1 - второе слово
- * @returns {bool} true если, слова однокоренные, иначе false
+ * @returns {bool} true, если слова однокоренные, иначе false
  */
-function isCognates(word1, word2) {
+function areCognates(word1, word2) {
     return natural.JaroWinklerDistance(word1, word2) > 0.85;
+}
+
+/**
+ * Возвращает объект Word из freqDict, который содержит слово однокоренное к word
+ * @param {String} word - слово
+ * @returns {Word|null} объект Word, если слово найдено, иначе null
+ */
+function takeCognate(word) {
+    return _.find(freqDict, obj => areCognates(word, obj.fullWord)) || null;
 }
 
 /**
@@ -175,13 +180,8 @@ function addWordArrayToDict(wordArray) {
  * @param {String} word - слово
  */
 function addWordToDict(word) {
-    for (let j = 0; j < frequencyDict.length; j++) {
-        if (isCognates(word, frequencyDict[j].root)) {
-            frequencyDict[j].count++;
-            return;
-        }
-    };
-    frequencyDict.push(new Word(word));
+    let cognate = takeCognate(word);
+    cognate ? cognate.count++ : freqDict.push(new Word(word));
 }
 
 /**
@@ -207,12 +207,11 @@ function generatePromise(callback, arg) {
  * @returns {String} топ n слов в формате '[word] [numberOfWord]/n'
  */
 function hiddenTop(n) {
-    frequencyDict.sort(compare).reverse();
-    let result = [];
-    for (let i = 0, length = Math.min(n, frequencyDict.length); i < length; i++) {
-        result.push(frequencyDict[i]);
-    };
-    return result.join('\n');
+    return _(freqDict)
+        .orderBy('count', 'desc')
+        .take(n)
+        .value()
+        .join('\n');
 }
 
 /**
@@ -221,14 +220,6 @@ function hiddenTop(n) {
  * @returns {String} найденное количесво однокоренных слов или сообщение, что таких не найдено
  */
 function hiddenCount(word) {
-    for (let i = 0; i < frequencyDict.length; i++) {
-        if (isCognates(word, frequencyDict[i].root)) {
-            return frequencyDict[i].count;
-        }
-    }
-    return 'word is not found';
+    let cognate = takeCognate(word);
+    return cognate ? cognate.count : 'word is not found';
 }
-
-function compare(a, b) {
-    return a.count - b.count;
-};
