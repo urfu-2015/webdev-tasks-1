@@ -43,8 +43,7 @@ let options = {
 //иначе вызывается handleError
 let promise = rp(options).then(
     promises => Promise.all(promises).then(
-        allTexts =>
-            processingText(allTexts),
+        allTexts => processingText(allTexts),
         handleError
     ),
     handleError
