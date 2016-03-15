@@ -5,7 +5,6 @@
     "lodash": "^4.6.1",
     "mocha": "^2.3.3",
     "natural": "^0.2.1",
-    "request": "^2.69.0",
     "request-promise": "^2.0.1",
     "url": "^0.11.0",
     "url-join": "0.0.1"
@@ -13,8 +12,4 @@
   "scripts": {
     "lint": "jscs ."
   },
-  "devDependencies": {
-    "natural": "^0.2.1",
-    "request": "^2.69.0"
-  }
 }
