@@ -7,8 +7,9 @@ const url = require('url');
 const OAUTH_TOKEN = fs.readFileSync('./key.txt', 'utf-8');
 const freqDict = [];
 const deferredAction = [];
+const urljoin = require('url-join');
+const config =  JSON.parse(fs.readFileSync('config.json', 'utf-8'));
 const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
-const GIT_URL = 'api.github.com';
 
 /**
  * Возвращает Promise, который при завершении без ошибок возвращает топ n слов
@@ -26,16 +27,16 @@ exports.top = (n) => generatePromise(hiddenTop, n);
 exports.count = (word) => generatePromise(hiddenCount, word);
 
 let address = url.format({
-    protocol: 'https',
-    host: GIT_URL,
-    pathname: '/orgs/urfu-2015/repos',
-    search: '?access_token=' + OAUTH_TOKEN
+    protocol: config.protocol,
+    host: config.host,
+    pathname: urljoin('orgs', config.repName, 'repos'),
+    query: {
+        [config.oauthQuery]: OAUTH_TOKEN 
+    }
 });
 let options = {
     uri: address,
-    headers: {
-        'User-Agent': 'request'
-    },
+    headers: config.headers,
     transform: promisesFromBody
 };
 
@@ -91,9 +92,7 @@ function isAppropriateRep(reposName) {
 function processingREADME(name) {
     let options = {
         uri: urlForReadme(name),
-        headers: {
-            'User-Agent': 'request'
-        },
+        headers: config.headers,
         transform: (body) =>
             JSON.parse(body).content
     };
@@ -101,17 +100,17 @@ function processingREADME(name) {
 }
 
 /**
- * формирует url запроса для обращения к README репозитория с именем reposName
- * @param {String} reposName - имя репозитория
+ * формирует url запроса для обращения к README репозитория с именем taskName
+ * @param {String} taskName - имя репозитория
  * @returns {String} url
  */
-function urlForReadme(reposName) {
+function urlForReadme(taskName) {
     return url.format({
-        protocol: 'https',
-        host: GIT_URL,
-        pathname: '/repos/urfu-2015/' + reposName + '/readme',
+        protocol: config.protocol,
+        host: config.host,
+        pathname: urljoin('repos', config.repName, taskName, 'readme'),
         query: {
-            'access_token': OAUTH_TOKEN 
+            [config.oauthQuery]: OAUTH_TOKEN 
         }
     });
 }

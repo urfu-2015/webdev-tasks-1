@@ -1,0 +1,9 @@
+{
+	"protocol": "https",
+	"host": "api.github.com",
+	"headers": {
+        "User-Agent": "request"
+    },
+    "oauthQuery": "access_token",
+    "repName": "urfu-2015"
+}
