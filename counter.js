@@ -8,8 +8,8 @@ const OAUTH_TOKEN = fs.readFileSync('./key.txt', 'utf-8');
 const freqDict = [];
 const deferredAction = [];
 const urljoin = require('url-join');
-const config =  JSON.parse(fs.readFileSync('config.json', 'utf-8'));
-const stopWords = JSON.parse(fs.readFileSync('stopWords.json', 'utf-8'));
+const config = require('./config.json');
+const stopWords = require('./stopWords.json');
 
 /**
  * Возвращает Promise, который при завершении без ошибок возвращает топ n слов
