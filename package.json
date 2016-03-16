@@ -1,6 +1,13 @@
 {
   "private": true,
   "dependencies": {
+    "bluebird": "3.3.4",
+    "co": "4.6.0",
+    "co-github": "1.0.0",
+    "github": "0.2.4",
+    "natural": "0.2.1"
+  },
+  "devDependencies": {
     "jscs": "^2.2.1",
     "mocha": "^2.3.3"
   },
