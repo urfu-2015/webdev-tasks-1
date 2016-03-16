@@ -16,27 +16,15 @@ gh.authenticate({
     token: token
 });
 
-let github = coGit(gh);
+const github = coGit(gh);
 
 module.exports = co.wrap(function *(user) {
-    let userData = yield github.repos.getFromUser({user: user});
-    let getReadmePromises = userData
-        .map(repo =>
-            repo.name
-        )
-        .filter(name =>
-            name.indexOf('tasks') > -1
-        )
-        .map(name =>
-            github.repos.getReadme({
-                user: user,
-                repo: name
-            })
-        );
-    let readmeData = yield getReadmePromises;
-    return readmeData
-        .map(data =>
-            new Buffer(data.content, 'base64').toString()
-        );
+    const userData = yield github.repos.getFromUser({user: user});
+    const getReadmePromises = userData
+        .map(repo => repo.name)
+        .filter(name => name.indexOf('tasks') > -1)
+        .map(name => github.repos.getReadme({user: user, repo: name}));
+    const readmeData = yield getReadmePromises;
+    return readmeData.map(data => new Buffer(data.content, 'base64').toString());
 });
 

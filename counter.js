@@ -6,13 +6,13 @@ const config = require('./config');
 
 const user = config.user;
 
-let count = function (word, callback) {
+const count = function (word, callback) {
     normalizeWords(user)
         .then(words => {
             let count = 0;
-            let rootWord = natural.PorterStemmerRu.stem(word);
+            const rootWord = natural.PorterStemmerRu.stem(word);
             words.forEach(function (word) {
-                let root = natural.PorterStemmerRu.stem(word);
+                const root = natural.PorterStemmerRu.stem(word);
                 if (rootWord === root) {
                     count++;
                 }
@@ -22,39 +22,31 @@ let count = function (word, callback) {
         .catch(callback);
 };
 
-let top = function (n, callback) {
+const top = function (n, callback) {
     normalizeWords(user)
         .then(words => {
             let statistics = {};
             words.forEach(function (word) {
-                let main = natural.PorterStemmerRu.stem(word);
-                if (!statistics[main]) {
-                    statistics[main] = {
+                const root = natural.PorterStemmerRu.stem(word);
+                if (!statistics[root]) {
+                    statistics[root] = {
                         word: word,
                         count: 1
                     };
                     return;
                 }
-                statistics[main].count++;
+                statistics[root].count++;
             });
-            let top = Object.keys(statistics).sort((root, anotherRoot) =>
-                statistics[anotherRoot].count - statistics[root].count)
-                .slice(0, n);
-            let res = top
+            const res = Object
+                .keys(statistics)
+                .sort((root, anotherRoot) => statistics[anotherRoot].count - statistics[root].count)
+                .slice(0, n)
                 .map(root => `${statistics[root].word} ${statistics[root].count}`)
                 .join('\n\r');
             callback(null, res);
         })
         .catch(callback);
 };
-
-count('котик', (err, n) => {
-    if (err) {
-        console.error('err', err);
-        return;
-    }
-    console.log('res', n);
-});
 
 module.exports = {
     top: top,
