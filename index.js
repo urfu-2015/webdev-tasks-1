@@ -1,4 +1,4 @@
 const counter = require('./counter');
-counter.count('код');
+console.log('котик', counter.count('котик'));
 console.log('-------');
-counter.top(10);
+console.log(counter.top(10));

@@ -1,14 +1,15 @@
 'use strict';
-var fs = require('fs');
-var token = fs.readFileSync('./key.txt', 'utf-8');
+const config = require('./config');
 
-function options() {
+function options(url) {
     return {
+        uri: url,
         headers: {
-            'User-Agent': 'request'
+            'User-Agent': 'Request-Promise'
         },
         qs: {
-            access_token: token // -> url + '?access_token=xxxxx'
+            access_token: config.token, // -> url + '?access_token=x'
+            per_page: 100
         }
     };
 }
@@ -22,110 +23,169 @@ function getRepos(listOfReposData) {
     return listOfRepos;
 }
 
-var prepsAndConjs = fs.readFileSync('./forbiddenWords.txt', 'utf-8');
-function sanitize(text) {
-    text = text.replace(/\r\n/g, ' ')
-        .replace(/<img.+>/g, ' ')
-        .replace(/https?:\/\/(\w+\.)+\w+\/([\w\-=\?]+\/?)+(\.\w+)*/g, ' ')
-        .replace(/[^a-zа-яё\-']+/ig, ' ')
-        .replace(/'([а-я])/ig, '$1') // апостроф в формах слов
-        .replace(/ -+ /g, ' ') // длинные и короткие тире
-        .replace(/([а-яa-z])- /ig, '$1 ') // дефисы, оставшиеся после обрезки числовой части
-        .replace(/\s{2,}/g, ' '); // пробелы количеством больше одного
-    var textArray = text.split(' ');
-    var arrOfPrepsAndConjs = prepsAndConjs.split('\n');
+function getTextArray(text) {
+    var textArray = sanitize(text).split(' ');
 
-    // сама собой в конце файла возникает переход на след. строку,
-    // из-за него в массиве пустой элемент
-    if (arrOfPrepsAndConjs[arrOfPrepsAndConjs.length - 1].length === 0) {
-        arrOfPrepsAndConjs.pop();
-    }
     var result = [];
-
     for (var i in textArray) {
         if (textArray[i].length <= 1 ||
-            arrOfPrepsAndConjs.indexOf(textArray[i].toLowerCase()) + 1) {
+            config.prepsAndConjs.indexOf(textArray[i].toLowerCase()) + 1) {
             continue;
         }
         result.push(textArray[i]);
     }
+    //console.log(result);
     return result;
 }
 
-function stemWord(word) {
-    var natural = require('natural').PorterStemmerRu;
-    return natural.stem(word);
+function sanitize(text) {
+    text = text.replace(/\r\n/g, ' ')
+        .replace(/<img.+>/g, ' ')
+        .replace(/https?:\/\/([-\w]+\.)+\w+\/([.\w=\?-]+\/?)+(\.\w+)*([.\w=\?-]+\/?)/ig, ' ')
+        .replace(/[^a-zа-яё'-]+/ig, ' ')
+        .replace(/([a-z])'([а-я])/ig, '$1$2') // апостроф в формах слов
+        .replace(/'/g, '') // остальные апострофы
+        .replace(/ -+ /g, ' ') // длинные и короткие тире
+        .replace(/([а-яa-z])- /ig, '$1 ') // дефисы, оставшиеся после обрезки числовой части
+        .replace(/ -([а-яa-z])/ig, ' $1')
+        .replace(/ [a-zа-я] /ig, ' ')
+        .replace(/\s{2,}/g, ' '); // пробелы количеством больше одного
+    //console.log(text);
+    return text;
 }
 
-function stemKeys(dictionary) {
+function getStemOfWord(word) {
+    return config.natural.stem(word);
+}
+
+function getStemOfKeys(dictionary) {
     var keys = Object.keys(dictionary);
-    for (var i in keys) {
-        keys[i] = stemWord(keys[i]);
-    }
+    keys.map(function (key) {
+        return getStemOfWord(key);
+    });
+    //for (var i in keys) {
+        //keys[i] = getStemOfWord(keys[i]);
+    //}
     return keys;
 }
 
-var request = require('./node_modules/sync-request');
+function filterRepos(list) {
+    var result = [];
+    for (var i in list) {
+        if (/.+tasks.+/.test(list[i])) {
+            result.push(list[i]);
+        }
+    }
+    return result;
+}
+
+function sortByValue(object) {
+    var sortedKeys = Object.keys(object).sort(function (a, b) {
+        return object[b] - object[a];
+    });
+    var result = {};
+    sortedKeys.forEach(function(key) {
+        result[key] = object[key];
+    });
+    return result;
+}
+
+// TODO Этот код не разбит на функции, тебе стоит подумать над разделением его на функции,
+// выполняющие атомарные действия: получить список репозиториев, получить все тексты, удалить
+// лишнее из текстов, получить массив слов, получить стемы (слова без окончаний), заполнить
+// словарь стемов и т.п. Так легче разбираться и рефакторить код в будущем.
+
+// TODO почему-то попадают слова с одинаковой основой
+// TODO откуда-то берётся NaN
+
 var repeatsOfWords = {};
-var list = request('GET', 'https://api.github.com/users/urfu-2015/repos', options())
-    .getBody('utf8');
-var listOfRepos = getRepos(list);
-for (var i in listOfRepos) {
-    //console.log('Смотрим репозиторий ' + listOfRepos[i]);
-    var response = request('GET', 'https://raw.githubusercontent.com/urfu-2015/' +
-        listOfRepos[i] + '/master/README.md', options());
-    if (response.statusCode === 200) {
-        var plainTextArray = sanitize(response.getBody('utf8'));
-        for (var k in plainTextArray) {
-            var word = plainTextArray[k].toLowerCase();
-            if (stemKeys(repeatsOfWords).indexOf(stemWord(word)) < 0) {
+
+var rp = config.request(options('https://api.github.com/users/urfu-2015/repos')).then(function(list) {
+    var listOfRepos = filterRepos(getRepos(list));
+    var listOfRequests = [];
+    listOfRepos.forEach(function(repo) {
+        listOfRequests.push(config.request(options('https://raw.githubusercontent.com/urfu-2015/'
+            + repo + '/master/README.md')));
+    });
+    return Promise.all(listOfRequests);
+}).then(function(listOfResponses) {
+    listOfResponses.forEach(function(response, i) {
+        var plainTextArray = getTextArray(response);
+        //console.log(i + ' response!');
+        plainTextArray.forEach(function(plainWord)  {
+            var word = plainWord.toLowerCase();
+            // TODO stemKeys вызывается много раз, вызывая natural для всех слов, делая одну и
+            // ту же работу. Измени логику работы, чтобы не выполнять лишние действия
+            if (getStemOfKeys(repeatsOfWords).indexOf(getStemOfWord(word)) === -1) {
                 repeatsOfWords[word] = 1;
             } else {
                 repeatsOfWords[word]++;
             }
-        }
-    }
-}
+        });
+    });
+    repeatsOfWords = sortByValue(repeatsOfWords);
+    return repeatsOfWords;
+}).catch(function(error) {
+    console.error(error);
+});
 
-module.exports.count = function (word) {
+function isCorrectWord (word) {
     if (typeof word !== 'string') {
-        console.log('Введите слово для проверки');
-        return;
+        console.error('Введите слово для проверки');
+        return false;
     }
     if (word.length === 0) {
-        console.log('Введите непустое слово для проверки');
-        return;
+        console.error('Введите непустое слово для проверки');
+        return false;
     }
 
-    var stemmedWordIndex = stemKeys(repeatsOfWords).indexOf(stemWord(word));
-    if (stemmedWordIndex < 0) {
-        console.log('Такого слова нам не встречалось');
-        return;
+    return true;
+}
+
+
+module.exports.count = function (word) {
+    if (isCorrectWord(word)) {
+        rp.then(function() {
+            var stemmedWordIndex = getStemOfKeys(repeatsOfWords).indexOf(getStemOfWord(word));
+            if (stemmedWordIndex < 0) {
+                console.error('Такого слова нам не встречалось ');
+                return;
+            }
+
+            var numOfRepeats = repeatsOfWords[Object.keys(repeatsOfWords)[stemmedWordIndex]];
+            console.log(word + ': ' + numOfRepeats);
+            return word + ': ' + numOfRepeats;
+        });
     }
-    var numOfRepeats = repeatsOfWords[Object.keys(repeatsOfWords)[stemmedWordIndex]];
-    console.log(word + ': ' + numOfRepeats);
 };
 
-module.exports.top = function (n) {
+function isCorrectCountOfWord (n) {
     if (typeof n !== 'number') {
-        console.log('Для рейтинга нужно число');
-        return;
+        console.error('Для рейтинга нужно число');
+        return false;
     }
     if (n < 1) {
-        console.log('Для рейтинга необходимо число, не меньше 1');
-        return;
+        console.error('Для рейтинга необходимо число, не меньше 1');
+        return false;
     }
+    return true;
+}
 
-    //console.log(repeatsOfWords);
-    if (n > Object.keys(repeatsOfWords).length) {
-        console.log('Нет в текстах столько слов');
-        return;
-    }
+module.exports.top = function (n) {
+    if (isCorrectCountOfWord(n)) {
+        rp.then(function() {
+            if (n > Object.keys(repeatsOfWords).length) {
+                console.log('Нет в текстах столько слов');
+                return;
+            }
 
-    var sortedByValue = Object.keys(repeatsOfWords).sort(function (a, b) {
-        return repeatsOfWords[b] - repeatsOfWords[a];
-    }).slice(0, n);
-    for (var i in sortedByValue) {
-        console.log(sortedByValue[i] + ': ' + repeatsOfWords[sortedByValue[i]]);
+            var topWords = Object.keys(repeatsOfWords).slice(0, n);
+            var top = {};
+            topWords.forEach(function(topWord) {
+                top[topWord] = repeatsOfWords[topWord];
+            });
+            console.log(top);
+            return top;
+        });
     }
 };
