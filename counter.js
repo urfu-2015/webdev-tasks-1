@@ -1,40 +1,58 @@
 'use strict';
 const fs = require('fs');
 const natural = require('natural');
-const disallowedWords = ['при', 'на', 'в', 'к', 'без', 'до', 'из', 'по', 'о', 'от',
-    'перед', 'через', 'с', 'у', 'за', 'над', 'об', 'под', 'про', 'для', 'и', 'но',
-    'а', 'или', 'не', 'же', 'это', 'как', 'если', 'вы', 'он', 'они', 'я', 'мы'];
-const reposNames = ['verstka-tasks-', 'javascript-tasks-'];
-const reposCount = 10;
+const promise = require('promise');
 
-module.exports.top = function (n) {
-    const token = fs.readFileSync('key.txt', 'utf-8');
-    var dictionary = {};
-    const callback = function (readme, responseCount) {
-        fillDictionary(readme, dictionary);
-        if (responseCount == reposNames.length * reposCount) {
-            let sortedWords;
-            sortedWords = Object.keys(dictionary).sort((word1, word2) => {
-                if (dictionary[word1] === dictionary[word2]) {
-                    return 0;
-                }
-                return dictionary[word1] < dictionary[word2] ? 1 : -1;
-            });
-            for (let i = 0; i < n; i++) {
-                console.log(`${sortedWords[i]} ${dictionary[sortedWords[i]]}`);
-            }
-        }
-
-    };
-
-    processReadmes(token, callback);
+const configs = {
+    names: ['verstka-tasks-', 'javascript-tasks-'],
+    count: 10,
+    disallowedWords : ['при', 'на', 'в', 'к', 'без', 'до', 'из', 'по', 'о', 'от',
+        'перед', 'через', 'с', 'у', 'за', 'над', 'об', 'под', 'про', 'для', 'и', 'но',
+        'а', 'или', 'не', 'же', 'это', 'как', 'если', 'вы', 'он', 'они', 'я', 'мы']
 };
+try {
+    var token = fs.readFileSync('key.txt', 'utf-8');
+} catch (error) {
+    console.log(error.message);
+}
 
-module.exports.count = function (word) {
-    const token = fs.readFileSync('key.txt', 'utf-8');
+/**
+ * Выводит n слов, наиболее часто встречающихся в тексте
+ * @param n количество слов
+ */
+function top(n) {
+    var readmes = [];
+    var dictionary = {};
+    promise.all(getReadmePromises(readmes)).then(() => {
+        let readmeWords = removeDisallowedSymbols(readmes);
+        fillDictionary(readmeWords, dictionary);
+        let sortedWords;
+        sortedWords = Object.keys(dictionary).sort((word1, word2) => {
+            if (dictionary[word1] === dictionary[word2]) {
+                return 0;
+            }
+            return dictionary[word1] < dictionary[word2] ? 1 : -1;
+        });
+
+        for (let i = 0; i < n; i++) {
+            console.log(`${sortedWords[i]} ${dictionary[sortedWords[i]]}`);
+        }
+    },
+    (err) => {
+        console.log(err.message);
+    });
+}
+
+/**
+ * Выводит сколько раз слово word встретилось в тексте
+ * @param word искомое слово
+ */
+function count(word) {
+    var readmes = [];
     var wordCount = 0;
-    const callback = function (readme, responseCount) {
-        readme.forEach((readmeWord) => {
+    promise.all(getReadmePromises(readmes)).then(() => {
+        let readmeWords = removeDisallowedSymbols(readmes);
+        readmeWords.forEach((readmeWord) => {
             let readmeWordStem = natural.PorterStemmerRu.stem(readmeWord);
             let wordStem = natural.PorterStemmerRu.stem(word);
 
@@ -42,65 +60,102 @@ module.exports.count = function (word) {
                 wordCount++;
             }
         });
-        if (responseCount == reposNames.length * reposCount) {
-            console.log(wordCount);
-        }
-    };
-
-    processReadmes(token, callback);
-};
-
-function processReadmes(token, callback) {
-    const https = require('https');
-    let responseCount = 0;
-
-    reposNames.forEach((repo) => {
-        for (let i = 1; i <= reposCount; i++) {
-            let str = '';
-            let repoPath = repo + i;
-            const req = https.request({
-                hostname: 'api.github.com',
-                port: 443,
-                path: `/repos/urfu-2015/${repoPath}/readme?access_token=${token}`,
-                headers: {
-                    'User-Agent': 'web-dev-task-1'
-                }
-            });
-
-            req.end();
-            req.on('response', (response) => {
-                response.on('data', (chunk) => {
-                    str += chunk;
-                });
-                response.on('end', () => {
-                    responseCount++;
-                    let readme64 = JSON.parse(str).content;
-                    let readme = new Buffer(readme64, 'base64').toString('utf-8');
-                    readme = clearReadme(readme);
-                    callback(readme, responseCount);
-                });
-            }
-            );
-        }
+        console.log(wordCount);
+    },
+    (err) => {
+        console.log(err.message);
     });
 }
 
-function clearReadme(data) {
-    data = data.toLowerCase();
-    let symblos = /[^а-яА-Я]/;
-    data = data
-        .split(symblos)
-        .filter((item) => {
-            return item !== '' && disallowedWords.indexOf(item) === -1;
-        });
-    return data;
+/**
+ * Возвращает промисы для получения всех ридми и записи их в readmes
+ * @param readmes массив, в который будут записаны ридми
+ * @returns {Array}
+ */
+function getReadmePromises (readmes) {
+    let promises = [];
+    configs.names.forEach((repo) => {
+        for (let i = 1; i <= configs.count; i++) {
+            let repoPath = `${repo}${i}`;
+            promises.push(getReadmePromise(repoPath, readmes));
+        }
+    });
+    return promises;
 }
 
-function fillDictionary(data, dictionary) {
+/**
+ * Возвращает промис для асинхронной загрузки одного ридми по указанному пути
+ * и записывает в readmes
+ * @param repoPath путь, по которому доступен ридми
+ * @param readmes массив, в который будут записаны ридми
+ * @returns {Promise}
+ */
+function getReadmePromise(repoPath, readmes) {
+    return new promise ((resolve, reject) => {
+        const https = require('https');
+        let str = '';
+        https
+        .request({
+            hostname: 'api.github.com',
+            port: 443,
+            path: `/repos/urfu-2015/${repoPath}/readme?access_token=${token}`,
+            headers: {
+                'User-Agent': 'web-dev-task-1'
+            }
+        })
+        .on('response', (response) => {
+            response.on('data', (chunk) => {
+                str += chunk;
+            });
+            response.on('end', () => {
+                let readme64;
+                try {
+                    readme64 = JSON.parse(str).content;
+                    readmes.push(new Buffer(readme64, 'base64').toString('utf-8'));
+                }
+                catch (err) {
+                    reject(err);
+                }
+                resolve();
+            });
+        })
+        .on('error', (err) => {
+            reject(err);
+        })
+        .end()
+    });
+}
+
+/**
+ * Удаляет из readmes все запрещённые символы и слова
+ * @param readmes ридми
+ * @returns {Array} массив оставшихся слов
+ */
+function removeDisallowedSymbols(readmes) {
+    let newReadme = [];
+    readmes.forEach((readme) => {
+        readme = readme.toLowerCase();
+        let symblos = /[^а-яА-ЯёЁ]/;
+        newReadme = newReadme.concat(readme
+            .split(symblos)
+            .filter((item) => {
+                return item && configs.disallowedWords.indexOf(item) < 0;
+            }));
+    });
+    return newReadme;
+}
+
+/**
+ * Создаёт словарь, показывающий, сколько раз
+ * слова встречаются в тексте
+ * @param readmes
+ * @param dictionary
+ */
+function fillDictionary(readmes, dictionary) {
     if (Object.keys(dictionary).length === 0) {
-        dictionary[data[0]] = 1;
+        dictionary[readmes[0]] = 1;
     }
-    data.forEach((word) => {
+    readmes.forEach((word) => {
         let hasCognate = false;
         let keys = Object.keys(dictionary);
 
@@ -119,3 +174,8 @@ function fillDictionary(data, dictionary) {
         }
     });
 }
+
+module.exports = {
+    top: top,
+    count: count
+};
