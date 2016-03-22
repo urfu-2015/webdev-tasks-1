@@ -1,12 +1,12 @@
 'use strict';
 const fs = require('fs');
 const natural = require('natural');
-const promise = require('promise');
+const Promise = require('promise');
 
 const configs = {
     names: ['verstka-tasks-', 'javascript-tasks-'],
     count: 10,
-    disallowedWords : ['при', 'на', 'в', 'к', 'без', 'до', 'из', 'по', 'о', 'от',
+    disallowedWords: ['при', 'на', 'в', 'к', 'без', 'до', 'из', 'по', 'о', 'от',
         'перед', 'через', 'с', 'у', 'за', 'над', 'об', 'под', 'про', 'для', 'и', 'но',
         'а', 'или', 'не', 'же', 'это', 'как', 'если', 'вы', 'он', 'они', 'я', 'мы']
 };
@@ -23,7 +23,7 @@ try {
 function top(n) {
     var readmes = [];
     var dictionary = {};
-    promise.all(getReadmePromises(readmes)).then(() => {
+    Promise.all(getReadmePromises(readmes)).then(() => {
         let readmeWords = removeDisallowedSymbols(readmes);
         fillDictionary(readmeWords, dictionary);
         let sortedWords;
@@ -50,7 +50,7 @@ function top(n) {
 function count(word) {
     var readmes = [];
     var wordCount = 0;
-    promise.all(getReadmePromises(readmes)).then(() => {
+    Promise.all(getReadmePromises(readmes)).then(() => {
         let readmeWords = removeDisallowedSymbols(readmes);
         readmeWords.forEach((readmeWord) => {
             let readmeWordStem = natural.PorterStemmerRu.stem(readmeWord);
@@ -72,7 +72,7 @@ function count(word) {
  * @param readmes массив, в который будут записаны ридми
  * @returns {Array}
  */
-function getReadmePromises (readmes) {
+function getReadmePromises(readmes) {
     let promises = [];
     configs.names.forEach((repo) => {
         for (let i = 1; i <= configs.count; i++) {
@@ -91,7 +91,7 @@ function getReadmePromises (readmes) {
  * @returns {Promise}
  */
 function getReadmePromise(repoPath, readmes) {
-    return new promise ((resolve, reject) => {
+    return new Promise((resolve, reject) => {
         const https = require('https');
         let str = '';
         https
@@ -112,8 +112,7 @@ function getReadmePromise(repoPath, readmes) {
                 try {
                     readme64 = JSON.parse(str).content;
                     readmes.push(new Buffer(readme64, 'base64').toString('utf-8'));
-                }
-                catch (err) {
+                } catch (err) {
                     reject(err);
                 }
                 resolve();
@@ -122,7 +121,7 @@ function getReadmePromise(repoPath, readmes) {
         .on('error', (err) => {
             reject(err);
         })
-        .end()
+        .end();
     });
 }
 
