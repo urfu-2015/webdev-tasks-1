@@ -12,7 +12,7 @@ const configs = {
         'а', 'или', 'не', 'же', 'это', 'как', 'если', 'вы', 'он', 'они', 'я', 'мы']
 };
 try {
-    var token = fs.readFileSync('key.txt', 'utf-8');
+    var token = fs.readFileSync('key.txt', 'utf-8').replace(/[^a-z0-9]/, '');
 } catch (error) {
     console.log(error.message);
 }
@@ -132,9 +132,11 @@ const getReadmePromise = (repoPath, readmes) => {
             response.on('end', () => {
                 try {
                     let readme64 = JSON.parse(str).content;
+
                     readmes.push(new Buffer(readme64, 'base64').toString('utf-8'));
                 } catch (err) {
                     reject(err);
+                    console.log(`response code: ${response.statusCode}`);
                 }
                 resolve();
             });
