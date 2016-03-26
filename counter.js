@@ -5,34 +5,45 @@ const config = require('./config');
 
 const githubConfig = config.githubConfig;
 const stopWords = config.stopWords;
-const repoRegExp = new RegExp(githubConfig.repoRegExp);
-const wordRegExp = new RegExp(config.wordRegExp);
+const repoRegExp = githubConfig.repoRegExp;
+const wordRegExp = config.wordRegExp;
 
-module.exports.top = function (n, callback) {
-    applyToStats(
-        (stats, cb) => {
-            getTop(stats, n, cb);
-        },
-        callback
-    );
+var statsCashe = {};
+var statsCashed = false;
+
+module.exports.top = (n, callback) => {
+    getStats((error, stats) => {
+        if (error) {
+            console.log(error);
+            return;
+        }
+
+        getTop(stats, n, callback);
+    });
 };
 
-module.exports.count = function (word, callback) {
-    applyToStats(
-        (stats, cb) => {
-            getWordCount(stats, word, cb);
-        },
-        callback
-    );
+module.exports.count = (word, callback) => {
+    getStats((error, stats) => {
+        if (error) {
+            console.log(error);
+            return;
+        }
+
+        getWordCount(stats, word, callback);
+    });
 };
 
-function applyToStats(func, callback) {
+function getStats(callback) {
+    if (statsCashed) {
+        callback(null, statsCashed);
+        return;
+    }
+
     async.waterfall([
         getGithub,
         getRepos,
         getReadmesStats,
-        mergeStats,
-        func
+        mergeStats
     ], callback);
 }
 
@@ -45,6 +56,7 @@ function getGithub(callback) {
         type: 'oauth',
         token: githubConfig.token
     });
+
     callback(null, github);
 }
 
@@ -55,10 +67,12 @@ function getRepos(github, callback) {
         },
         (error, repos) => {
             if (error) {
-                callback(error, null);
+                callback(error);
                 return;
             }
+
             var repoNames = repos.map(getRepoName).filter(repoIsMatching);
+
             callback(null, github, repoNames);
         }
     );
@@ -99,10 +113,12 @@ function getReadme(github, repo, callback) {
         },
         (error, data) => {
             if (error) {
-                callback(error, null);
+                callback(error);
                 return;
             }
+
             var readme = (new Buffer(data.content, 'base64')).toString();
+
             callback(null, readme);
         }
     );
@@ -120,6 +136,7 @@ function countWords(readme, callback) {
         word = word.toLowerCase();
         if (isRussian(word) && !isStopWord(word)) {
             var root = natural.PorterStemmerRu.stem(word);
+
             if (stats.rootCount[root] === undefined) {
                 stats.rootCount[root] = 0;
                 stats.rootToWord[root] = word;
@@ -127,6 +144,7 @@ function countWords(readme, callback) {
             stats.rootCount[root]++;
         }
     });
+
     callback(null, stats);
 }
 
@@ -141,7 +159,8 @@ function isStopWord(word) {
 function mergeStats(statsList, callback) {
     var mergedStats = {
         rootCount: {},
-        rootToWord: {}
+        rootToWord: {},
+        sortedRoots: []
     };
 
     statsList.forEach((stats) => {
@@ -153,21 +172,30 @@ function mergeStats(statsList, callback) {
             mergedStats.rootCount[root] += stats.rootCount[root];
         });
     });
+
+    mergedStats.sortedRoots = Object.keys(mergedStats.rootCount);
+    mergedStats.sortedRoots.sort((a, b) => {
+        return mergedStats.rootCount[b] - mergedStats.rootCount[a];
+    });
+
+    casheStats(mergedStats);
+
     callback(null, mergedStats);
 }
 
-function getTop(stats, n, callback) {
-    var roots = Object.keys(stats.rootCount);
+function casheStats(stats) {
+    statsCashe = stats;
+    statsCashed = true;
+}
 
-    roots.sort((a, b) => {
-        return stats.rootCount[b] - stats.rootCount[a];
-    });
-    var top = roots.slice(0, n).map((root, i) => {
+function getTop(stats, n, callback) {
+    var top = stats.sortedRoots.slice(0, n).map((root, i) => {
         return {
             word: stats.rootToWord[root],
             count: stats.rootCount[root]
         };
     });
+
     callback(null, top);
 }
 
@@ -177,5 +205,6 @@ function getWordCount(stats, word, callback) {
     if (stats.rootCount[root] === undefined) {
         callback(null, 0);
     }
+
     callback(null, stats.rootCount[root]);
 }
