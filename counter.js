@@ -1,7 +1,7 @@
 'use strict';
 const https = require('https');
 const fs = require('fs');
-const natural = require('natural');
+const stemmer = require('natural').PorterStemmerRu;
 const Promise = require('promise');
 
 const configs = {
@@ -9,7 +9,7 @@ const configs = {
     count: 10,
     disallowedWords: ['при', 'на', 'в', 'к', 'без', 'до', 'из', 'по', 'о', 'от',
         'перед', 'через', 'с', 'у', 'за', 'над', 'об', 'под', 'про', 'для', 'и', 'но',
-        'а', 'или', 'не', 'же', 'это', 'как', 'если', 'вы', 'он', 'они', 'я', 'мы']
+        'а', 'или', 'не', 'же', 'это', 'как', 'если', 'вы', 'он', 'они', 'я', 'мы', 'то']
 };
 try {
     var token = fs.readFileSync('key.txt', 'utf-8').replace(/[^a-z0-9]/, '');
@@ -48,8 +48,8 @@ const count = (word) => {
         let readmeWords = removeDisallowedSymbols(readmes);
 
         readmeWords.forEach((readmeWord) => {
-            let readmeWordStem = natural.PorterStemmerRu.stem(readmeWord);
-            let wordStem = natural.PorterStemmerRu.stem(word);
+            let readmeWordStem = stemmer.stem(readmeWord);
+            let wordStem = stemmer.stem(word);
 
             if (readmeWordStem === wordStem) {
                 wordCount++;
@@ -68,23 +68,12 @@ const count = (word) => {
  * @param n
  */
 const printFirstN = (dictionary, n) => {
-    /*let sortedWords = Object.keys(dictionary).sort((word1, word2) => {
-        return dictionary[word1] < dictionary[word2] ? 1 : -1;
-    });
-
-    for (let i = 0; i < n; i++) {
-        console.log(`${sortedWords[i]} ${dictionary[sortedWords[i]]}`);
-    }*/
     let sortedWords = Object.keys(dictionary).sort((i, j) => {
-        return (dictionary[i] < dictionary[j]) ? -1 : 1;
+        return (dictionary[i] < dictionary[j]) ? 1 : -1;
     });
-    let i = sortedWords.length;
 
-    for (i; i--;) {
-        if (sortedWords.length - i === n + 1) {
-            return;
-        }
-        console.log(`${sortedWords[i]} ${dictionary[sortedWords[i]]}`);
+    for (n; n--;) {
+        console.log(`${sortedWords[n]} ${dictionary[sortedWords[n]]}`);
     }
 };
 
@@ -135,8 +124,8 @@ const getReadmePromise = (repoPath, readmes) => {
 
                     readmes.push(new Buffer(readme64, 'base64').toString('utf-8'));
                 } catch (err) {
-                    reject(err);
                     console.log(`response code: ${response.statusCode}`);
+                    reject(err);
                 }
                 resolve();
             });
@@ -184,8 +173,8 @@ const fillDictionary = (readmes, dictionary) => {
         let keys = Object.keys(dictionary);
 
         for (let i = 0; i < keys.length; i++) {
-            let keyStem = natural.PorterStemmerRu.stem(keys[i]);
-            let wordStem = natural.PorterStemmerRu.stem(word);
+            let keyStem = stemmer.stem(keys[i]);
+            let wordStem = stemmer.stem(word);
 
             if (keyStem === wordStem) {
                 dictionary[keys[i]]++;
