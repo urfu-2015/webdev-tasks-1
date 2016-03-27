@@ -23,18 +23,17 @@ function getRepos(listOfReposData) {
     return listOfRepos;
 }
 
-function getTextArray(text) {
+function getWordsArray(text) {
     var textArray = sanitize(text).split(' ');
 
     var result = [];
-    for (var i in textArray) {
-        if (textArray[i].length <= 1 ||
-            config.prepsAndConjs.indexOf(textArray[i].toLowerCase()) + 1) {
-            continue;
+    textArray.forEach(function (word) {
+        if (word.length <= 1 ||
+            config.prepsAndConjs.indexOf(word.toLowerCase()) + 1) {
+            return;
         }
-        result.push(textArray[i]);
-    }
-    //console.log(result);
+        result.push(word);
+    });
     return result;
 }
 
@@ -50,7 +49,6 @@ function sanitize(text) {
         .replace(/ -([а-яa-z])/ig, ' $1')
         .replace(/ [a-zа-я] /ig, ' ')
         .replace(/\s{2,}/g, ' '); // пробелы количеством больше одного
-    //console.log(text);
     return text;
 }
 
@@ -59,14 +57,10 @@ function getStemOfWord(word) {
 }
 
 function getStemOfKeys(dictionary) {
-    var keys = Object.keys(dictionary);
-    keys.map(function (key) {
+    var result = Object.keys(dictionary).map(function (key) {
         return getStemOfWord(key);
     });
-    //for (var i in keys) {
-        //keys[i] = getStemOfWord(keys[i]);
-    //}
-    return keys;
+    return result;
 }
 
 function filterRepos(list) {
@@ -90,41 +84,43 @@ function sortByValue(object) {
     return result;
 }
 
-// TODO Этот код не разбит на функции, тебе стоит подумать над разделением его на функции,
-// выполняющие атомарные действия: получить список репозиториев, получить все тексты, удалить
-// лишнее из текстов, получить массив слов, получить стемы (слова без окончаний), заполнить
-// словарь стемов и т.п. Так легче разбираться и рефакторить код в будущем.
-
-// TODO почему-то попадают слова с одинаковой основой
-// TODO откуда-то берётся NaN
-
-var repeatsOfWords = {};
-
-var rp = config.request(options('https://api.github.com/users/urfu-2015/repos')).then(function(list) {
-    var listOfRepos = filterRepos(getRepos(list));
-    var listOfRequests = [];
+function fillListOFRequests(listOfRepos) {
+    var result = [];
     listOfRepos.forEach(function(repo) {
-        listOfRequests.push(config.request(options('https://raw.githubusercontent.com/urfu-2015/'
+        result.push(config.request(options('https://raw.githubusercontent.com/urfu-2015/'
             + repo + '/master/README.md')));
     });
+    return result;
+}
+
+function fillDictionaryOfRepeats(dictionary, plainTextArray, arrayOfStems) {
+    plainTextArray.forEach(function(plainWord)  {
+        var word = plainWord.toLowerCase();
+        var stemmedWord = getStemOfWord(word);
+        var indexOfStemmedWord = arrayOfStems.indexOf(stemmedWord);
+        if (indexOfStemmedWord === -1) {
+            arrayOfStems.push(stemmedWord);
+            dictionary[word] = 1;
+        } else {
+            var foundWord = Object.keys(dictionary)[indexOfStemmedWord];
+            dictionary[foundWord]++;
+        }
+    });
+}
+
+var rp =
+    config.request(options('https://api.github.com/users/urfu-2015/repos')).then(function(list) {
+
+    var listOfRequests = fillListOFRequests(filterRepos(getRepos(list)));
     return Promise.all(listOfRequests);
 }).then(function(listOfResponses) {
-    listOfResponses.forEach(function(response, i) {
-        var plainTextArray = getTextArray(response);
-        //console.log(i + ' response!');
-        plainTextArray.forEach(function(plainWord)  {
-            var word = plainWord.toLowerCase();
-            // TODO stemKeys вызывается много раз, вызывая natural для всех слов, делая одну и
-            // ту же работу. Измени логику работы, чтобы не выполнять лишние действия
-            if (getStemOfKeys(repeatsOfWords).indexOf(getStemOfWord(word)) === -1) {
-                repeatsOfWords[word] = 1;
-            } else {
-                repeatsOfWords[word]++;
-            }
-        });
+    var repeatsOfWords = {};
+    var arrayOfStems = [];
+    listOfResponses.forEach(function(response) {
+        fillDictionaryOfRepeats(repeatsOfWords, getWordsArray(response), arrayOfStems);
     });
     repeatsOfWords = sortByValue(repeatsOfWords);
-    return repeatsOfWords;
+    return Promise.resolve(repeatsOfWords);
 }).catch(function(error) {
     console.error(error);
 });
@@ -144,19 +140,18 @@ function isCorrectWord (word) {
 
 
 module.exports.count = function (word) {
-    if (isCorrectWord(word)) {
-        rp.then(function() {
-            var stemmedWordIndex = getStemOfKeys(repeatsOfWords).indexOf(getStemOfWord(word));
-            if (stemmedWordIndex < 0) {
-                console.error('Такого слова нам не встречалось ');
-                return;
-            }
-
-            var numOfRepeats = repeatsOfWords[Object.keys(repeatsOfWords)[stemmedWordIndex]];
-            console.log(word + ': ' + numOfRepeats);
-            return word + ': ' + numOfRepeats;
-        });
+    if (!isCorrectWord(word)) {
+        return Promise.reject();
     }
+    return rp.then(function(repeats) {
+        var stemmedWordIndex = getStemOfKeys(repeats).indexOf(getStemOfWord(word));
+        if (stemmedWordIndex < 0) {
+            return Promise.reject('Такого слова нам не встречалось');
+        }
+
+        var numOfRepeats = repeats[Object.keys(repeats)[stemmedWordIndex]];
+        return Promise.resolve(word + ': ' + numOfRepeats);
+    });
 };
 
 function isCorrectCountOfWord (n) {
@@ -172,20 +167,20 @@ function isCorrectCountOfWord (n) {
 }
 
 module.exports.top = function (n) {
-    if (isCorrectCountOfWord(n)) {
-        rp.then(function() {
-            if (n > Object.keys(repeatsOfWords).length) {
-                console.log('Нет в текстах столько слов');
-                return;
-            }
-
-            var topWords = Object.keys(repeatsOfWords).slice(0, n);
-            var top = {};
-            topWords.forEach(function(topWord) {
-                top[topWord] = repeatsOfWords[topWord];
-            });
-            console.log(top);
-            return top;
-        });
+    if (!isCorrectCountOfWord(n)) {
+        return Promise.reject();
     }
+    return rp.then(function(repeats) {
+        if (n > Object.keys(repeats).length) {
+            console.error('Нет в текстах столько слов');
+            return Promise.reject();
+        }
+
+        var topWords = Object.keys(repeats).slice(0, n);
+        var top = {};
+        topWords.forEach(function(topWord) {
+            top[topWord] = repeats[topWord];
+        });
+        return Promise.resolve(top);
+    });
 };

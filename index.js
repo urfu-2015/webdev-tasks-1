@@ -1,4 +1,7 @@
 const counter = require('./counter');
-console.log('котик', counter.count('котик'));
-console.log('-------');
-console.log(counter.top(10));
+counter.count('котик').then(function (data) {
+    console.log(data);
+});
+counter.top(10).then(function (data) {
+    console.log(data);
+});
