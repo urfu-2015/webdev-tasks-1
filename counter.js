@@ -67,11 +67,11 @@ function getRepos(github, callback) {
         },
         (error, repos) => {
             if (error) {
-                callback(error);
+                callback(error, null);
                 return;
             }
 
-            var repoNames = repos.map(getRepoName).filter(repoIsMatching);
+            var repoNames = repos.map(getRepoName).filter(isRepoMatching);
 
             callback(null, github, repoNames);
         }
@@ -82,7 +82,7 @@ function getRepoName(repo) {
     return repo.name;
 }
 
-function repoIsMatching(repoName) {
+function isRepoMatching(repoName) {
     return repoRegExp.test(repoName);
 }
 
@@ -113,7 +113,7 @@ function getReadme(github, repo, callback) {
         },
         (error, data) => {
             if (error) {
-                callback(error);
+                callback(error, null);
                 return;
             }
 
