@@ -108,7 +108,7 @@ function fillDictionaryOfRepeats(dictionary, plainTextArray, arrayOfStems) {
     });
 }
 
-var rp =
+var getRepeatsOfWords =
     config.request(options('https://api.github.com/users/urfu-2015/repos')).then(function(list) {
 
     var listOfRequests = fillListOFRequests(filterRepos(getRepos(list)));
@@ -125,13 +125,15 @@ var rp =
     console.error(error);
 });
 
+var errorText = '';
+
 function isCorrectWord (word) {
     if (typeof word !== 'string') {
-        console.error('Введите слово для проверки');
+        errorText = 'аргумент должен быть строкой';
         return false;
     }
-    if (word.length === 0) {
-        console.error('Введите непустое слово для проверки');
+    if (!word.length) {
+        errorText = 'пустая строка';
         return false;
     }
 
@@ -141,26 +143,27 @@ function isCorrectWord (word) {
 
 module.exports.count = function (word) {
     if (!isCorrectWord(word)) {
-        return Promise.reject();
+        return Promise.reject('Неверный аргумент для подсчёта: ' + errorText);
     }
-    return rp.then(function(repeats) {
+    return getRepeatsOfWords.then(function(repeats) {
         var stemmedWordIndex = getStemOfKeys(repeats).indexOf(getStemOfWord(word));
         if (stemmedWordIndex < 0) {
             return Promise.reject('Такого слова нам не встречалось');
         }
 
         var numOfRepeats = repeats[Object.keys(repeats)[stemmedWordIndex]];
+
         return Promise.resolve(word + ': ' + numOfRepeats);
     });
 };
 
 function isCorrectCountOfWord (n) {
     if (typeof n !== 'number') {
-        console.error('Для рейтинга нужно число');
+        errorText = 'аргумент должен быть числом';
         return false;
     }
     if (n < 1) {
-        console.error('Для рейтинга необходимо число, не меньше 1');
+        errorText = 'для рейтинга необходимо число, не меньше 1';
         return false;
     }
     return true;
@@ -168,19 +171,20 @@ function isCorrectCountOfWord (n) {
 
 module.exports.top = function (n) {
     if (!isCorrectCountOfWord(n)) {
-        return Promise.reject();
+        return Promise.reject('Неверный аргумент для рейтинга: ' + errorText);
     }
-    return rp.then(function(repeats) {
+    return getRepeatsOfWords.then(function(repeats) {
         if (n > Object.keys(repeats).length) {
-            console.error('Нет в текстах столько слов');
-            return Promise.reject();
+            return Promise.reject('Нет в текстах столько слов');
         }
 
         var topWords = Object.keys(repeats).slice(0, n);
         var top = {};
+
         topWords.forEach(function(topWord) {
             top[topWord] = repeats[topWord];
         });
+
         return Promise.resolve(top);
     });
 };
