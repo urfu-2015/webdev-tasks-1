@@ -19,6 +19,7 @@ var sendRequest = (header, callback) => {
         };
         if (res.statusCode !== 200) {
             console.log(`Finished with ${res.statusCode}`);
+            return;
         } else {
             let data = JSON.parse(body);
             callback(data);
@@ -31,7 +32,8 @@ var createDictionary = (callback) => {
         var repos = [];
         repositories.forEach((repo, repoIndex, repositories) => {
             if (isRepoWithReadme(repo.name)) {
-                let repoUrl = `https://api.github.com/repos/urfu-2015/${repo.name}/readme?access_token=${token}`;
+                let repoUrl = `https://api.github.com/repos/urfu-2015/${repo.name}/` +
+                `readme?access_token=${token}`;
                 getReadmeText(repoUrl, () => {
                     if (counter == 20) {
                         isDictionaryCreated = true;
@@ -49,13 +51,13 @@ var getReadmeText = (repoUrl, callback) => {
         getFrequency(readmeBuffer, () => {
             counter++;
         });
-    callback();
+        callback();
     });
 };
 
 var getFrequency = (readme, callback) => {
     let words = readme.replace(/[^а-яёА-ЯЁ]+/g, ' ').split(' ').filter((word) => {
-        return word.length > 0
+        return word.length > 0;
     }).filter((word) => {
         return stopwords.indexOf(word) === -1;
     }).map((word) => {
@@ -69,7 +71,7 @@ var getFrequency = (readme, callback) => {
         }
     });
     callback();
-}
+};
 
 var sortKeys = (count) => {
     let keys = Object.keys(dictionary);
@@ -77,10 +79,10 @@ var sortKeys = (count) => {
         return dictionary[b] - dictionary[a];
     });
     for (var i = 0; i < count; i++) {
-        let answerString = `Слово ${keys[i]} встречается ${dictionary[keys[i]]} раз`
+        let answerString = `Слово ${keys[i]} встречается ${dictionary[keys[i]]} раз`;
         console.log(answerString);
     }
-}
+};
 
 var isRepoWithReadme = (repoName) => {
     if (repoName.indexOf('verstka-tasks-') != -1 || repoName.indexOf('javascript-tasks-') != -1) {
@@ -114,5 +116,7 @@ module.exports.top = (count) => {
         createDictionary(sortKeys.bind(null, count));
     } else {
         sortKeys(count);
-    }
-}
+    };
+};
+
+module.exports.count('вы');
