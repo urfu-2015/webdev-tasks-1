@@ -52,5 +52,4 @@ https://developer.github.com/v3/
 ### Дополнительное задание
 
 В качестве дополнительного задания предлагается использовать потоки (Streams).
-
 <img width="500" src="https://cloud.githubusercontent.com/assets/4534405/13143204/251de9fc-d664-11e5-9321-f04847e243e3.jpg" title="Все любят топы">
